@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* Deep Forest Green theme for luxury invitation-only media */
+    --background: 140 10% 97%;
+    --foreground: 150 30% 10%;
+    --card: 140 10% 99%;
+    --card-foreground: 150 30% 10%;
+    --popover: 140 10% 99%;
+    --popover-foreground: 150 30% 10%;
+    --primary: 150 30% 15%;
+    --primary-foreground: 43 50% 90%;
+    --secondary: 140 8% 93%;
+    --secondary-foreground: 150 30% 15%;
+    --muted: 140 6% 92%;
+    --muted-foreground: 150 10% 45%;
+    --accent: 43 72% 52%;
+    --accent-foreground: 150 30% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 140 10% 88%;
+    --input: 140 10% 88%;
+    --ring: 43 72% 52%;
+    --chart-1: 150 30% 15%;
+    --chart-2: 43 72% 52%;
+    --chart-3: 150 20% 30%;
+    --chart-4: 43 50% 70%;
+    --chart-5: 150 15% 50%;
+    --radius: 0.5rem;
+    --sidebar-background: 150 30% 15%;
+    --sidebar-foreground: 43 50% 90%;
+    --sidebar-primary: 43 72% 52%;
+    --sidebar-primary-foreground: 150 30% 10%;
+    --sidebar-accent: 150 25% 20%;
+    --sidebar-accent-foreground: 43 50% 90%;
+    --sidebar-border: 150 20% 22%;
+    --sidebar-ring: 43 72% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
