@@ -4,8 +4,8 @@ import { Noto_Sans_JP, Noto_Serif_JP } from 'next/font/google'
 
 import './globals.css'
 
-const _notoSans = Noto_Sans_JP({ subsets: ['latin'], variable: '--font-noto-sans' })
-const _notoSerif = Noto_Serif_JP({ subsets: ['latin'], variable: '--font-noto-serif' })
+const _notoSans = Noto_Sans_JP({ subsets: ['latin', 'japanese'], variable: '--font-noto-sans' })
+const _notoSerif = Noto_Serif_JP({ subsets: ['latin', 'japanese'], variable: '--font-noto-serif' })
 
 export const metadata: Metadata = {
   title: 'TheJapanLocalMedia - 信頼の循環インフラ',
