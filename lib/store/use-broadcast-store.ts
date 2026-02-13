@@ -17,7 +17,7 @@ export const useBroadcastStore = create<BroadcastState>()(
             })),
         }),
         {
-            name: 'junkan-broadcast-storage',
+            name: 'tjm-broadcast-storage',
         }
     )
 )

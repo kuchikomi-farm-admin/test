@@ -85,6 +85,7 @@ export function AdminUsers() {
               <TableHead className="text-xs text-[#1B3022]/40 font-medium text-right py-4 px-6">{"紹介数"}</TableHead>
               <TableHead className="text-xs text-[#1B3022]/40 font-medium text-right py-4 px-6 hidden md:table-cell">{"クリック数"}</TableHead>
               <TableHead className="text-xs text-[#1B3022]/40 font-medium text-right py-4 px-6 hidden md:table-cell">{"登録完了"}</TableHead>
+              <TableHead className="text-xs text-[#1B3022]/40 font-medium text-right py-4 px-6 hidden md:table-cell">{"CVR"}</TableHead>
               <TableHead className="text-xs text-[#1B3022]/40 font-medium text-right py-4 px-6">{"操作"}</TableHead>
             </TableRow>
           </TableHeader>
@@ -105,6 +106,13 @@ export function AdminUsers() {
                 </TableCell>
                 <TableCell className="text-right py-4 px-6 hidden md:table-cell">
                   <span className="text-sm text-[#1B3022]/60">{user.registrations}</span>
+                </TableCell>
+                <TableCell className="text-right py-4 px-6 hidden md:table-cell">
+                  <span className="text-sm text-[#1B3022]/60">
+                    {user.clicks > 0
+                      ? `${((user.registrations / user.clicks) * 100).toFixed(1)}%`
+                      : "-"}
+                  </span>
                 </TableCell>
                 <TableCell className="text-right py-4 px-6">
                   <button

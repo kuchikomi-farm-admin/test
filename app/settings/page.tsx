@@ -1,39 +1,51 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppHeader } from "@/components/app-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Camera, Save, Shield, Bell, User, KeyRound, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Camera, Save, Bell, User } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useUserStore } from "@/lib/store/use-user-store"
+import {
+  updateProfile,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+} from "@/app/actions/profile"
 
 const tabs = [
   { id: "profile", label: "プロフィール", icon: User },
-  { id: "security", label: "セキュリティ", icon: Shield },
   { id: "notifications", label: "通知設定", icon: Bell },
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
 
 export default function SettingsPage() {
+  const { user, updateProfile: updateStoreProfile } = useUserStore()
   const [activeTab, setActiveTab] = useState<TabId>("profile")
-  const [showCurrentPw, setShowCurrentPw] = useState(false)
-  const [showNewPw, setShowNewPw] = useState(false)
 
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState("")
+  const [error, setError] = useState("")
+
+  // Profile form state
   const [profile, setProfile] = useState({
-    displayName: "田中 太郎",
-    email: "tanaka@example.com",
-    phone: "090-1234-5678",
-    bio: "地方創生に関心を持つマーケター。東京在住。週末は地方巡り。",
-    location: "東京都渋谷区",
-    company: "株式会社サンプル",
-    position: "マーケティング部長",
+    displayName: "",
+    email: "",
+    phone: "",
+    bio: "",
+    location: "",
+    company: "",
+    position: "",
   })
 
+
+
+  // Notification state
   const [notifications, setNotifications] = useState({
     emailNewContent: true,
     emailNewsletter: true,
@@ -42,6 +54,88 @@ export default function SettingsPage() {
     lineReward: true,
     pushBrowser: false,
   })
+
+
+
+  // Initialize profile from store
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        displayName: user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        bio: user.bio || "",
+        location: user.location || "",
+        company: user.company || "",
+        position: user.position || "",
+      })
+    }
+  }, [user])
+
+  // Load notification preferences
+  useEffect(() => {
+    getNotificationPreferences().then((result) => {
+      if (result.data) {
+        setNotifications({
+          emailNewContent: result.data.email_new_content,
+          emailNewsletter: result.data.email_newsletter,
+          emailInviteUpdate: result.data.email_invite_update,
+          lineNewContent: result.data.line_new_content,
+          lineReward: result.data.line_reward,
+          pushBrowser: result.data.push_browser,
+        })
+      }
+    })
+  }, [])
+
+
+
+  const handleProfileSave = async () => {
+    setError("")
+    setSaveMessage("")
+    setIsSaving(true)
+
+    const result = await updateProfile({
+      displayName: profile.displayName,
+      phone: profile.phone,
+      bio: profile.bio,
+      location: profile.location,
+      company: profile.company,
+      position: profile.position,
+    })
+
+    setIsSaving(false)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    updateStoreProfile({ name: profile.displayName, phone: profile.phone, bio: profile.bio, location: profile.location, company: profile.company, position: profile.position })
+    setSaveMessage("プロフィールを更新しました")
+    setTimeout(() => setSaveMessage(""), 3000)
+  }
+
+
+
+  const handleNotificationSave = async () => {
+    setError("")
+    setSaveMessage("")
+    setIsSaving(true)
+
+    const result = await updateNotificationPreferences(notifications)
+    setIsSaving(false)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    setSaveMessage("通知設定を更新しました")
+    setTimeout(() => setSaveMessage(""), 3000)
+  }
+
+
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
@@ -63,6 +157,18 @@ export default function SettingsPage() {
           <h1 className="font-serif text-2xl text-[#1B3022] mt-1">{"アカウント設定"}</h1>
         </div>
 
+        {/* Status Messages */}
+        {error && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-center">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+        {saveMessage && (
+          <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-center">
+            <p className="text-sm text-green-700">{saveMessage}</p>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
           {tabs.map((tab) => {
@@ -71,7 +177,7 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setError(""); setSaveMessage("") }}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm whitespace-nowrap transition-colors",
                   activeTab === tab.id
@@ -93,7 +199,9 @@ export default function SettingsPage() {
             <div className="flex items-center gap-5">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-[#1B3022]/10 flex items-center justify-center">
-                  <span className="text-2xl font-serif text-[#1B3022]/50">{"田"}</span>
+                  <span className="text-2xl font-serif text-[#1B3022]/50">
+                    {user?.name?.[0] || "?"}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -104,9 +212,9 @@ export default function SettingsPage() {
                 </button>
               </div>
               <div>
-                <p className="text-sm font-medium text-[#1B3022]">{profile.displayName}</p>
-                <p className="text-xs text-[#D4AF37]">{"会員No. JK-00247"}</p>
-                <p className="text-xs text-[#1B3022]/30 mt-0.5">{"会員ランク: スタンダード"}</p>
+                <p className="text-sm font-medium text-[#1B3022]">{user?.name || ""}</p>
+                <p className="text-xs text-[#D4AF37]">{`会員No. ${user?.memberId || "---"}`}</p>
+                <p className="text-xs text-[#1B3022]/30 mt-0.5">{`会員ランク: ${user?.rank || "---"}`}</p>
               </div>
             </div>
 
@@ -126,8 +234,8 @@ export default function SettingsPage() {
                   <Input
                     type="email"
                     value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    className="h-11 border-[#1B3022]/10"
+                    disabled
+                    className="h-11 border-[#1B3022]/10 bg-[#1B3022]/3"
                   />
                 </div>
               </div>
@@ -180,119 +288,20 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex justify-end pt-2">
-                <Button className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] gap-2">
+                <Button
+                  onClick={handleProfileSave}
+                  disabled={isSaving}
+                  className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] gap-2"
+                >
                   <Save className="w-4 h-4" />
-                  {"変更を保存"}
+                  {isSaving ? "保存中..." : "変更を保存"}
                 </Button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Security Tab */}
-        {activeTab === "security" && (
-          <div className="space-y-6">
-            {/* Password Change */}
-            <div className="rounded-xl border border-[#1B3022]/8 bg-background p-6 space-y-5">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-[#D4AF37]" />
-                <h3 className="font-serif text-lg text-[#1B3022]">{"パスワード変更"}</h3>
-              </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-xs text-[#1B3022]/50">{"現在のパスワード"}</Label>
-                  <div className="relative">
-                    <Input
-                      type={showCurrentPw ? "text" : "password"}
-                      placeholder="現在のパスワードを入力"
-                      className="h-11 border-[#1B3022]/10 pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPw(!showCurrentPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B3022]/30 hover:text-[#1B3022]/60"
-                      aria-label={showCurrentPw ? "パスワードを隠す" : "パスワードを表示"}
-                    >
-                      {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-[#1B3022]/50">{"新しいパスワード"}</Label>
-                  <div className="relative">
-                    <Input
-                      type={showNewPw ? "text" : "password"}
-                      placeholder="新しいパスワードを入力"
-                      className="h-11 border-[#1B3022]/10 pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPw(!showNewPw)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B3022]/30 hover:text-[#1B3022]/60"
-                      aria-label={showNewPw ? "パスワードを隠す" : "パスワードを表示"}
-                    >
-                      {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-[#1B3022]/30">{"8文字以上、英数字と記号を含めてください"}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs text-[#1B3022]/50">{"新しいパスワード（確認）"}</Label>
-                  <Input
-                    type="password"
-                    placeholder="新しいパスワードを再入力"
-                    className="h-11 border-[#1B3022]/10"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <Button className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] gap-2">
-                  <Shield className="w-4 h-4" />
-                  {"パスワードを更新"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Login History */}
-            <div className="rounded-xl border border-[#1B3022]/8 bg-background p-6 space-y-4">
-              <h3 className="font-serif text-lg text-[#1B3022]">{"ログイン履歴"}</h3>
-              <div className="space-y-3">
-                {[
-                  { device: "Chrome / macOS", ip: "203.0.113.xx", time: "2026年2月9日 10:32", current: true },
-                  { device: "Safari / iOS", ip: "203.0.113.xx", time: "2026年2月8日 18:15", current: false },
-                  { device: "Chrome / Windows", ip: "198.51.100.xx", time: "2026年2月7日 09:45", current: false },
-                ].map((session, i) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-[#1B3022]/5 last:border-0">
-                    <div>
-                      <p className="text-sm text-[#1B3022]">
-                        {session.device}
-                        {session.current && (
-                          <span className="ml-2 text-[10px] bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded-full">
-                            {"現在のセッション"}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-[#1B3022]/30 mt-0.5">{`${session.ip} - ${session.time}`}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Danger Zone */}
-            <div className="rounded-xl border border-red-200 bg-red-50/30 p-6 space-y-4">
-              <h3 className="font-serif text-lg text-red-700">{"アカウント削除"}</h3>
-              <p className="text-xs text-red-600/60 leading-relaxed">
-                {"アカウントを削除すると、すべてのデータが完全に削除されます。この操作は取り消せません。"}
-              </p>
-              <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 bg-transparent">
-                {"アカウントを削除する"}
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Notifications Tab */}
         {activeTab === "notifications" && (
@@ -358,9 +367,13 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex justify-end">
-              <Button className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] gap-2">
+              <Button
+                onClick={handleNotificationSave}
+                disabled={isSaving}
+                className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] gap-2"
+              >
                 <Save className="w-4 h-4" />
-                {"通知設定を保存"}
+                {isSaving ? "保存中..." : "通知設定を保存"}
               </Button>
             </div>
           </div>

@@ -27,7 +27,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[#F8F9FA]">
       <AppHeader isAdmin />
 
-      <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
+      <div className="mx-auto max-w-[1400px] px-4 md:px-8 lg:px-12 py-8">
         {/* Header */}
         <div className="mb-8">
           <p className="text-xs text-[#1B3022]/40 tracking-wider uppercase">{"Admin Dashboard"}</p>

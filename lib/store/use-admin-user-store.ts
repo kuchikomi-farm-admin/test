@@ -17,7 +17,7 @@ export const useAdminUserStore = create<AdminUserState>()(
             })),
         }),
         {
-            name: 'junkan-admin-user-storage',
+            name: 'tjm-admin-user-storage',
         }
     )
 )

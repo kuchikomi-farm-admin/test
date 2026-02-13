@@ -23,7 +23,7 @@ export const useRewardStore = create<RewardState>()(
             })),
         }),
         {
-            name: 'junkan-reward-storage',
+            name: 'tjm-reward-storage',
         }
     )
 )

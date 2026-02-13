@@ -37,7 +37,7 @@ export const useContentStore = create<ContentState>()(
                 })),
         }),
         {
-            name: 'junkan-content-storage',
+            name: 'tjm-content-storage',
         }
     )
 )

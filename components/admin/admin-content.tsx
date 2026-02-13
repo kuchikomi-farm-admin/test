@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,6 +36,9 @@ import { useContentStore } from "@/lib/store/use-content-store"
 import { Content, ContentType, ContentStatus, MemberRank } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { uploadThumbnail, uploadVideo } from "@/app/actions/content"
+import Image from "next/image"
+import { MarkdownEditor } from "@/components/markdown-editor"
 
 /* ---------- Constants ---------- */
 const typeConfig: Record<ContentType, { label: string; icon: typeof FileText; color: string }> = {
@@ -82,9 +85,35 @@ export function AdminContent() {
   const [newIsPremium, setNewIsPremium] = useState(false)
   const [newRequiredRank, setNewRequiredRank] = useState<MemberRank>("all")
 
+  // Thumbnail state
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
   // Loading states
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingVideo(true)
+    const formData = new FormData()
+    formData.append("file", file)
+    const result = await uploadVideo(formData)
+    setIsUploadingVideo(false)
+    if ("error" in result) {
+      toast({ title: "エラー", description: result.error, variant: "destructive" })
+      return
+    }
+    if (result.url) {
+      setNewVideoUrl(result.url)
+      toast({ title: "アップロード完了", description: "動画URLが設定されました" })
+    }
+    // Reset file input
+    if (videoInputRef.current) videoInputRef.current.value = ""
+  }
 
   const items = mounted ? contents : []
 
@@ -110,6 +139,7 @@ export function AdminContent() {
       author: newAuthor,
       views: 0,
       url: newType === "external" ? newUrl : (newType === "video" ? newVideoUrl : undefined),
+      thumbnail: thumbnailUrl || undefined,
     }
     addContent(newItem)
     setIsSaving(false)
@@ -144,6 +174,7 @@ export function AdminContent() {
     setNewScheduleDate("")
     setNewIsPremium(false)
     setNewRequiredRank("all")
+    setThumbnailUrl(null)
   }
 
   return (
@@ -231,11 +262,11 @@ export function AdminContent() {
           {newType === "article" && (
             <div className="space-y-2">
               <Label className="text-xs text-[#1B3022]/50">{"記事本文"}</Label>
-              <Textarea
-                placeholder="記事の本文を入力（Markdown対応）..."
+              <MarkdownEditor
                 value={newBody}
-                onChange={(e) => setNewBody(e.target.value)}
-                className="min-h-[160px] border-[#1B3022]/10 resize-none"
+                onChange={setNewBody}
+                placeholder="Markdownで記事の本文を入力..."
+                minHeight="280px"
               />
             </div>
           )}
@@ -251,9 +282,30 @@ export function AdminContent() {
                     onChange={(e) => setNewVideoUrl(e.target.value)}
                     className="h-11 border-[#1B3022]/10 flex-1"
                   />
-                  <Button variant="outline" className="h-11 border-[#1B3022]/10 text-[#1B3022]/50 gap-2 bg-transparent">
-                    <Upload className="w-4 h-4" />
-                    {"アップロード"}
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                    onChange={handleVideoUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    className="h-11 border-[#1B3022]/10 text-[#1B3022]/50 gap-2 bg-transparent"
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={isUploadingVideo}
+                  >
+                    {isUploadingVideo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {"アップロード中..."}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        {"アップロード"}
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -307,10 +359,48 @@ export function AdminContent() {
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-[#1B3022]/50">{"サムネイル画像"}</Label>
-              <div className="h-11 border border-dashed border-[#1B3022]/15 rounded-lg flex items-center justify-center gap-2 text-xs text-[#1B3022]/40 cursor-pointer hover:border-[#D4AF37]/40 transition-colors">
-                <Upload className="w-4 h-4" />
-                {"画像をアップロード"}
-              </div>
+              {thumbnailUrl ? (
+                <div className="relative h-24 rounded-lg overflow-hidden border border-[#1B3022]/10">
+                  <Image src={thumbnailUrl} alt="サムネイル" fill className="object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setThumbnailUrl(null)}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <label className="h-20 border border-dashed border-[#1B3022]/15 rounded-lg flex flex-col items-center justify-center gap-1 text-xs text-[#1B3022]/40 cursor-pointer hover:border-[#D4AF37]/40 transition-colors">
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      {"画像を選択（5MB以下）"}
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setIsUploading(true)
+                      const fd = new FormData()
+                      fd.append("file", file)
+                      const result = await uploadThumbnail(fd)
+                      setIsUploading(false)
+                      if ("url" in result) {
+                        setThumbnailUrl(result.url)
+                      } else {
+                        toast({ title: "エラー", description: result.error, variant: "destructive" })
+                      }
+                    }}
+                  />
+                </label>
+              )}
             </div>
           </div>
 

@@ -1,37 +1,77 @@
 "use client"
 
-import React from "react"
+import React, { Suspense } from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Eye, EyeOff, UserPlus, CheckCircle2 } from "lucide-react"
+import { signUp, verifyInviteCode } from "@/app/actions/auth"
 
 export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
+  )
+}
+
+function RegisterForm() {
+  const searchParams = useSearchParams()
+  const codeFromUrl = searchParams.get("code") || ""
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     lastName: "",
     firstName: "",
     question: "",
+    inviteCode: codeFromUrl,
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  const [error, setError] = useState("")
+  const [referrerName, setReferrerName] = useState("")
 
-  const referrer = "Tanaka Yuki"
+  // Verify invite code from URL on mount
+  useEffect(() => {
+    if (codeFromUrl) {
+      verifyInviteCode(codeFromUrl).then((result) => {
+        if (result.valid && result.referrer_name) {
+          setReferrerName(result.referrer_name)
+        }
+      })
+    }
+  }, [codeFromUrl])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
     setIsSubmitting(true)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setIsComplete(true)
-    }, 1500)
+
+    const result = await signUp({
+      lastName: formData.lastName,
+      firstName: formData.firstName,
+      email: formData.email,
+      password: formData.password,
+      question: formData.question,
+      inviteCode: formData.inviteCode,
+    })
+
+    setIsSubmitting(false)
+
+    if (result && "error" in result && result.error) {
+      setError(result.error)
+      return
+    }
+
+    setIsComplete(true)
   }
 
   if (isComplete) {
@@ -46,10 +86,24 @@ export default function RegisterPage() {
             <CheckCircle2 className="w-10 h-10 text-[#D4AF37]" />
           </div>
           <div className="space-y-3">
-            <h2 className="font-serif text-2xl text-[#F8F9FA]">{"登録が完了しました"}</h2>
+            <h2 className="font-serif text-2xl text-[#F8F9FA]">{"ご登録ありがとうございます"}</h2>
             <p className="text-sm text-[#F8F9FA]/60 leading-relaxed">
-              {"審査完了後、ログイン可能になり次第メールにてお知らせいたします。通常1〜2営業日以内にご連絡差し上げます。"}
+              {"ご入力いただいたメールアドレスに認証メールをお送りしました。"}
+              <br />
+              {"メール内のリンクをクリックして認証を完了してください。"}
             </p>
+            <p className="text-sm text-[#F8F9FA]/60 leading-relaxed">
+              {"認証後、管理者による審査を経てアカウントが有効化されます。"}
+              <br />
+              {"通常1〜2営業日以内にご連絡差し上げます。"}
+            </p>
+            <div className="mt-4 p-3 rounded-lg bg-[#F8F9FA]/5 border border-[#F8F9FA]/10">
+              <p className="text-xs text-[#F8F9FA]/50 leading-relaxed">
+                {"メールが届かない場合は、迷惑メールフォルダもご確認ください。"}
+                <br />
+                {"それでも届かない場合は、しばらく待ってから再度お試しください。"}
+              </p>
+            </div>
           </div>
           <Link
             href="/"
@@ -73,7 +127,7 @@ export default function RegisterPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-block">
-            <h1 className="font-serif text-3xl tracking-wider text-[#F8F9FA]">JUNKAN</h1>
+            <h1 className="font-serif text-3xl tracking-wider text-[#F8F9FA]">TheJapanLocalMedia</h1>
           </Link>
           <div className="mt-3 flex items-center justify-center gap-3">
             <span className="h-px w-8 bg-[#D4AF37]" />
@@ -83,18 +137,45 @@ export default function RegisterPage() {
         </div>
 
         {/* Referrer Badge */}
-        <div className="mb-8 flex items-center justify-center gap-3 py-3 px-5 rounded-full bg-[#F8F9FA]/5 border border-[#F8F9FA]/10 w-fit mx-auto">
-          <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
-            <UserPlus className="w-4 h-4 text-[#D4AF37]" />
+        {referrerName && (
+          <div className="mb-8 flex items-center justify-center gap-3 py-3 px-5 rounded-full bg-[#F8F9FA]/5 border border-[#F8F9FA]/10 w-fit mx-auto">
+            <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
+              <UserPlus className="w-4 h-4 text-[#D4AF37]" />
+            </div>
+            <p className="text-sm text-[#F8F9FA]/70">
+              <span className="text-[#D4AF37] font-medium">{referrerName}</span>
+              {"  さんからの招待"}
+            </p>
           </div>
-          <p className="text-sm text-[#F8F9FA]/70">
-            <span className="text-[#D4AF37] font-medium">{referrer}</span>
-            {"  さんからの招待"}
-          </p>
-        </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
+            <p className="text-sm text-red-300">{error}</p>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Invite Code (if not from URL) */}
+          {!codeFromUrl && (
+            <div className="space-y-2">
+              <Label htmlFor="invite-code" className="text-xs tracking-widest uppercase text-[#F8F9FA]/50">
+                {"招待コード"}
+              </Label>
+              <Input
+                id="invite-code"
+                type="text"
+                placeholder="XXXX-XXXX-XXXX"
+                value={formData.inviteCode}
+                onChange={(e) => setFormData({ ...formData, inviteCode: e.target.value })}
+                className="h-12 bg-[#F8F9FA]/5 border-[#F8F9FA]/10 text-[#F8F9FA] placeholder:text-[#F8F9FA]/25 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
+                required
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="last-name" className="text-xs tracking-widest uppercase text-[#F8F9FA]/50">
@@ -149,7 +230,7 @@ export default function RegisterPage() {
               <Input
                 id="reg-password"
                 type={showPassword ? "text" : "password"}
-                placeholder="8文字以上"
+                placeholder="8文字以上（英字・数字を含む）"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 className="h-12 bg-[#F8F9FA]/5 border-[#F8F9FA]/10 text-[#F8F9FA] placeholder:text-[#F8F9FA]/25 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 pr-12"
@@ -204,7 +285,7 @@ export default function RegisterPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-[#F8F9FA]/30 leading-relaxed">
-          {"登録申請後、審査を経てアカウントが有効化されます。"}
+          {"登録申請後、メール認証と審査を経てアカウントが有効化されます。"}
           <br />
           {"既にアカウントをお持ちの方は"}
           <Link href="/" className="text-[#D4AF37]/60 hover:text-[#D4AF37] transition-colors ml-1">
