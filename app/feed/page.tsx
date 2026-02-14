@@ -20,48 +20,47 @@ import {
   Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useContentStore } from "@/lib/store/use-content-store"
 import { useEffect } from "react"
-import { getRecommendedContents } from "@/app/actions/interactions"
+import { getPublishedContents } from "@/app/actions/content"
 import type { Content, ContentType, ContentStatus, MemberRank } from "@/lib/types"
-
-// Static data removed - using stores below
 
 type TabKey = "articles" | "videos" | "external"
 
+function mapDbContent(c: Record<string, unknown>): Content {
+  return {
+    id: c.id as string,
+    type: c.type as ContentType,
+    title: c.title as string,
+    description: (c.description as string) || "",
+    body: (c.body as string) || "",
+    status: c.status as ContentStatus,
+    publishDate: (c.publish_date as string) || "",
+    author: c.author_name as string,
+    thumbnail: c.thumbnail_url as string | undefined,
+    views: (c.views as number) || 0,
+    premium: (c.premium as boolean) || false,
+    requiredRank: (c.required_rank as MemberRank) || "all",
+    url: c.url as string | undefined,
+    duration: c.duration as string | undefined,
+  }
+}
+
 export default function FeedPage() {
-  const { contents } = useContentStore()
   const [mounted, setMounted] = useState(false)
-  const [recommendedItems, setRecommendedItems] = useState<Content[]>([])
+  const [items, setItems] = useState<Content[]>([])
 
   useEffect(() => {
     setMounted(true)
-    getRecommendedContents(3).then((result) => {
-      if (result.data && result.data.length > 0) {
-        setRecommendedItems(result.data.map((c: Record<string, unknown>) => ({
-          id: c.id as string,
-          type: c.type as ContentType,
-          title: c.title as string,
-          description: (c.description as string) || "",
-          status: c.status as ContentStatus,
-          publishDate: (c.publish_date as string) || "",
-          author: c.author_name as string,
-          thumbnail: c.thumbnail_url as string | undefined,
-          views: c.views as number,
-          premium: c.premium as boolean,
-          requiredRank: (c.required_rank as MemberRank) || "all",
-          duration: c.duration as string | undefined,
-        })))
+    getPublishedContents().then((result) => {
+      if ("data" in result && result.data) {
+        setItems(result.data.map(mapDbContent))
       }
     })
   }, [])
 
   const [activeTab, setActiveTab] = useState<TabKey>("articles")
 
-  const items = mounted ? contents.filter(c => c.status === "published") : []
-
-  // DB推薦がなければフォールバック
-  const recommended = recommendedItems.length > 0 ? recommendedItems : items.slice(0, 3)
+  const recommended = items.slice(0, 3)
   const articles = items.filter(c => c.type === "article")
   const videos = items.filter(c => c.type === "video")
   const externalLinks = items.filter(c => c.type === "external")

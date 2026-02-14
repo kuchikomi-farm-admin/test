@@ -32,11 +32,10 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import { useContentStore } from "@/lib/store/use-content-store"
-import { Content, ContentType, ContentStatus, MemberRank } from "@/lib/types"
+import { ContentType, ContentStatus, MemberRank } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import { uploadThumbnail, uploadVideo } from "@/app/actions/content"
+import { uploadThumbnail, uploadVideo, getAllContents, createContent as createContentAction, deleteContent as deleteContentAction } from "@/app/actions/content"
 import Image from "next/image"
 import { MarkdownEditor } from "@/components/markdown-editor"
 
@@ -62,12 +61,53 @@ const rankLabels: Record<MemberRank, string> = {
 }
 
 /* ---------- Component ---------- */
+interface ContentItem {
+  id: string
+  type: ContentType
+  title: string
+  description?: string
+  body?: string
+  status: ContentStatus
+  publishDate: string
+  author: string
+  thumbnail?: string
+  views: number
+  likes?: number
+  premium: boolean
+  requiredRank: MemberRank
+  url?: string
+  duration?: string
+  tags?: string[]
+}
+
 export function AdminContent() {
-  const { contents, addContent, deleteContent } = useContentStore()
   const { toast } = useToast()
+  const [contents, setContents] = useState<ContentItem[]>([])
   // Hydration safety
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    getAllContents().then((result) => {
+      if ("data" in result && result.data) {
+        setContents(result.data.map((c: Record<string, unknown>) => ({
+          id: c.id as string,
+          type: c.type as ContentType,
+          title: c.title as string,
+          description: (c.description as string) || "",
+          body: (c.body as string) || "",
+          status: c.status as ContentStatus,
+          publishDate: (c.publish_date as string) || "",
+          author: c.author_name as string,
+          thumbnail: c.thumbnail_url as string | undefined,
+          views: (c.views as number) || 0,
+          premium: (c.premium as boolean) || false,
+          requiredRank: (c.required_rank as MemberRank) || "all",
+          url: c.url as string | undefined,
+          duration: c.duration as string | undefined,
+        })))
+      }
+    })
+  }, [])
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [filterType, setFilterType] = useState<"all" | ContentType>("all")
@@ -124,43 +164,62 @@ export function AdminContent() {
 
   const handleCreate = async () => {
     setIsSaving(true)
-    // Artificial delay
-    await new Promise(resolve => setTimeout(resolve, 600))
 
-    const newItem: Content = {
-      id: Math.random().toString(36).substr(2, 9),
+    const status = newScheduleDate ? "scheduled" : "published"
+    const result = await createContentAction({
       type: newType,
       title: newTitle,
-      body: newBody,
-      status: newScheduleDate ? "scheduled" : "published",
-      publishDate: newScheduleDate || new Date().toISOString().split('T')[0],
+      authorName: newAuthor,
+      body: newBody || undefined,
+      url: newType === "external" ? newUrl : (newType === "video" ? newVideoUrl : undefined),
+      thumbnailUrl: thumbnailUrl || undefined,
+      status,
+      publishDate: newScheduleDate || undefined,
       premium: newIsPremium,
       requiredRank: newIsPremium ? newRequiredRank : "all",
-      author: newAuthor,
-      views: 0,
-      url: newType === "external" ? newUrl : (newType === "video" ? newVideoUrl : undefined),
-      thumbnail: thumbnailUrl || undefined,
-    }
-    addContent(newItem)
-    setIsSaving(false)
-    toast({
-      title: "保存完了",
-      description: "新しいコンテンツを保存しました。",
-      variant: "default",
     })
+
+    setIsSaving(false)
+
+    if ("error" in result) {
+      toast({ title: "エラー", description: result.error, variant: "destructive" })
+      return
+    }
+
+    if (result.data) {
+      const c = result.data
+      setContents((prev) => [{
+        id: c.id,
+        type: c.type as ContentType,
+        title: c.title,
+        description: c.description || "",
+        body: c.body || "",
+        status: c.status as ContentStatus,
+        publishDate: c.publish_date || "",
+        author: c.author_name,
+        thumbnail: c.thumbnail_url || undefined,
+        views: c.views,
+        premium: c.premium,
+        requiredRank: (c.required_rank as MemberRank) || "all",
+        url: c.url || undefined,
+        duration: c.duration || undefined,
+      }, ...prev])
+    }
+
+    toast({ title: "保存完了", description: "新しいコンテンツを保存しました。" })
     resetForm()
   }
 
   const handleDelete = async (id: string) => {
     setDeletingId(id)
-    await new Promise(resolve => setTimeout(resolve, 500))
-    deleteContent(id)
+    const result = await deleteContentAction(id)
+    if ("error" in result) {
+      toast({ title: "エラー", description: result.error, variant: "destructive" })
+    } else {
+      setContents((prev) => prev.filter((c) => c.id !== id))
+      toast({ title: "削除完了", description: "コンテンツを削除しました。", variant: "destructive" })
+    }
     setDeletingId(null)
-    toast({
-      title: "削除完了",
-      description: "コンテンツを削除しました。",
-      variant: "destructive",
-    })
   }
 
   const resetForm = () => {
