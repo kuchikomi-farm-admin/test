@@ -13,16 +13,34 @@ import {
 } from "@/components/ui/table"
 import { Search, ArrowUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useAdminUserStore } from "@/lib/store/use-admin-user-store"
+import { getAdminUsers, updateUserStatus } from "@/app/actions/admin"
+
+interface AdminUser {
+  id: string
+  name: string
+  email: string
+  referrals: number
+  clicks: number
+  registrations: number
+  status: "active" | "pending"
+  joinDate: string
+}
 
 export function AdminUsers() {
-  const { users, updateUserStatus } = useAdminUserStore()
   const [mounted, setMounted] = useState(false)
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<"referrals" | "clicks" | "registrations">("referrals")
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    getAdminUsers().then((result) => {
+      if ("users" in result) setUsers(result.users)
+      setLoading(false)
+    })
+  }, [])
 
   if (!mounted) return null
 
@@ -32,10 +50,22 @@ export function AdminUsers() {
 
   const handleToggleStatus = async (id: string, currentStatus: "active" | "pending") => {
     setLoadingId(id)
-    await new Promise(resolve => setTimeout(resolve, 600))
     const newStatus = currentStatus === "active" ? "pending" : "active"
-    updateUserStatus(id, newStatus)
+    const result = await updateUserStatus(id, newStatus)
+    if (result.success) {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === id ? { ...u, status: newStatus } : u))
+      )
+    }
     setLoadingId(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-[#D4AF37]" />
+      </div>
+    )
   }
 
   return (
@@ -90,55 +120,63 @@ export function AdminUsers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((user) => (
-              <TableRow key={user.id} className="hover:bg-[#1B3022]/2 border-b border-[#1B3022]/5 last:border-0">
-                <TableCell className="py-4 px-6">
-                  <div>
-                    <p className="text-sm font-medium text-[#1B3022]">{user.name}</p>
-                    <p className="text-xs text-[#1B3022]/30">{user.email}</p>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right py-4 px-6">
-                  <span className="font-serif text-[#1B3022]">{user.referrals}</span>
-                </TableCell>
-                <TableCell className="text-right py-4 px-6 hidden md:table-cell">
-                  <span className="text-sm text-[#1B3022]/60">{user.clicks}</span>
-                </TableCell>
-                <TableCell className="text-right py-4 px-6 hidden md:table-cell">
-                  <span className="text-sm text-[#1B3022]/60">{user.registrations}</span>
-                </TableCell>
-                <TableCell className="text-right py-4 px-6 hidden md:table-cell">
-                  <span className="text-sm text-[#1B3022]/60">
-                    {user.clicks > 0
-                      ? `${((user.registrations / user.clicks) * 100).toFixed(1)}%`
-                      : "-"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right py-4 px-6">
-                  <button
-                    onClick={() => handleToggleStatus(user.id, user.status)}
-                    disabled={loadingId === user.id}
-                    className="inline-flex"
-                  >
-                    {loadingId === user.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
-                    ) : (
-                      <Badge
-                        variant={user.status === "active" ? "default" : "secondary"}
-                        className={cn(
-                          "cursor-pointer transition-all hover:scale-105",
-                          user.status === "active"
-                            ? "bg-[#1B3022]/10 text-[#1B3022] hover:bg-[#1B3022]/10"
-                            : "bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/10"
-                        )}
-                      >
-                        {user.status === "active" ? "承認済み" : "承認待ち"}
-                      </Badge>
-                    )}
-                  </button>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-sm text-[#1B3022]/40">
+                  {"ユーザーが見つかりません"}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filtered.map((user) => (
+                <TableRow key={user.id} className="hover:bg-[#1B3022]/2 border-b border-[#1B3022]/5 last:border-0">
+                  <TableCell className="py-4 px-6">
+                    <div>
+                      <p className="text-sm font-medium text-[#1B3022]">{user.name}</p>
+                      <p className="text-xs text-[#1B3022]/30">{user.email}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right py-4 px-6">
+                    <span className="font-serif text-[#1B3022]">{user.referrals}</span>
+                  </TableCell>
+                  <TableCell className="text-right py-4 px-6 hidden md:table-cell">
+                    <span className="text-sm text-[#1B3022]/60">{user.clicks}</span>
+                  </TableCell>
+                  <TableCell className="text-right py-4 px-6 hidden md:table-cell">
+                    <span className="text-sm text-[#1B3022]/60">{user.registrations}</span>
+                  </TableCell>
+                  <TableCell className="text-right py-4 px-6 hidden md:table-cell">
+                    <span className="text-sm text-[#1B3022]/60">
+                      {user.clicks > 0
+                        ? `${((user.registrations / user.clicks) * 100).toFixed(1)}%`
+                        : "-"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right py-4 px-6">
+                    <button
+                      onClick={() => handleToggleStatus(user.id, user.status)}
+                      disabled={loadingId === user.id}
+                      className="inline-flex"
+                    >
+                      {loadingId === user.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#D4AF37]" />
+                      ) : (
+                        <Badge
+                          variant={user.status === "active" ? "default" : "secondary"}
+                          className={cn(
+                            "cursor-pointer transition-all hover:scale-105",
+                            user.status === "active"
+                              ? "bg-[#1B3022]/10 text-[#1B3022] hover:bg-[#1B3022]/10"
+                              : "bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                          )}
+                        >
+                          {user.status === "active" ? "承認済み" : "承認待ち"}
+                        </Badge>
+                      )}
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
