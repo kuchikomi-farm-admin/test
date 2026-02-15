@@ -76,7 +76,7 @@ export async function createContent(input: {
       status: input.status as "draft" | "scheduled" | "published",
       publish_date: input.publishDate || (input.status === "published" ? new Date().toISOString() : null),
       premium: input.premium,
-      required_rank: input.requiredRank as "standard" | "gold" | "platinum" | "diamond",
+      required_rank: (input.requiredRank === "all" ? "standard" : input.requiredRank) as "standard" | "gold" | "platinum" | "diamond",
       duration: input.duration || null,
     })
     .select()
