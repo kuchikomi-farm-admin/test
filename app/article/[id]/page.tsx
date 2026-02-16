@@ -468,12 +468,6 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-[#1B3022]">{content.author}</p>
-                <button
-                  type="button"
-                  className="text-[10px] px-2.5 py-1 rounded-full border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
-                >
-                  {"フォロー"}
-                </button>
               </div>
               <p className="text-xs text-[#1B3022]/40 mt-0.5">{content.publishDate}</p>
             </div>
@@ -587,12 +581,6 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
                 {content.authorBio || "TheJapanLocalMediaの認定コントリビューターとして、地方創生や観光の最前線で活動する専門家。"}
               </p>
             </div>
-            <button
-              type="button"
-              className="px-6 py-2 rounded-full border border-[#D4AF37] text-[#D4AF37] text-sm hover:bg-[#D4AF37]/10 transition-colors"
-            >
-              {"フォローする"}
-            </button>
           </div>
         </div>
 
