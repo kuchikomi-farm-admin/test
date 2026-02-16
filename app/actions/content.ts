@@ -7,8 +7,14 @@ import { revalidatePath } from "next/cache"
 // ──────── コンテンツ一覧取得（公開済み） ────────
 export async function getPublishedContents() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "未認証です" }
 
-  const { data, error } = await supabase
+  // admin client を使い RLS に依存しない（Server Action 内で auth.uid() が
+  // 正しく解決されないケースを回避）
+  const adminClient = createAdminClient()
+
+  const { data, error } = await adminClient
     .from("contents")
     .select("*")
     .eq("status", "published")
@@ -112,8 +118,12 @@ export async function deleteContent(id: string) {
 // ──────── コンテンツ単体取得 ────────
 export async function getContentById(id: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "未認証です" }
 
-  const { data, error } = await supabase
+  const adminClient = createAdminClient()
+
+  const { data, error } = await adminClient
     .from("contents")
     .select("*")
     .eq("id", id)
@@ -147,10 +157,12 @@ export async function uploadThumbnail(formData: FormData) {
   // ファイル名生成
   const ext = file.name.split(".").pop() || "jpg"
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-  const filePath = `thumbnails/${fileName}`
+  const filePath = fileName
 
-  // Supabase Storage アップロード
-  const { error: uploadError } = await supabase.storage
+  // admin client で Storage RLS をバイパス
+  const adminClient = createAdminClient()
+
+  const { error: uploadError } = await adminClient.storage
     .from("thumbnails")
     .upload(filePath, file, {
       contentType: file.type,
@@ -158,11 +170,11 @@ export async function uploadThumbnail(formData: FormData) {
     })
 
   if (uploadError) {
-    return { error: "アップロードに失敗しました" }
+    return { error: `アップロードに失敗しました: ${uploadError.message}` }
   }
 
   // 公開URLを取得
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = adminClient.storage
     .from("thumbnails")
     .getPublicUrl(filePath)
 
@@ -175,7 +187,9 @@ export async function updateContentThumbnail(contentId: string, thumbnailUrl: st
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "未認証です" }
 
-  const { error } = await supabase
+  const adminClient = createAdminClient()
+
+  const { error } = await adminClient
     .from("contents")
     .update({ thumbnail_url: thumbnailUrl })
     .eq("id", contentId)
@@ -210,8 +224,10 @@ export async function uploadVideo(formData: FormData) {
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
   const filePath = `videos/${fileName}`
 
-  // Supabase Storage アップロード
-  const { error: uploadError } = await supabase.storage
+  // admin client で Storage RLS をバイパス
+  const adminClient = createAdminClient()
+
+  const { error: uploadError } = await adminClient.storage
     .from("content-media")
     .upload(filePath, file, {
       contentType: file.type,
@@ -223,7 +239,7 @@ export async function uploadVideo(formData: FormData) {
   }
 
   // 公開URLを取得
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = adminClient.storage
     .from("content-media")
     .getPublicUrl(filePath)
 

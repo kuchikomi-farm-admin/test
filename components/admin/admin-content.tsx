@@ -162,10 +162,10 @@ export function AdminContent() {
     .filter((item) => filterStatus === "all" || item.status === filterStatus)
     .filter((item) => item.title.includes(searchQuery) || item.author.includes(searchQuery))
 
-  const handleCreate = async () => {
+  const handleCreate = async (saveAsDraft = false) => {
     setIsSaving(true)
 
-    const status = newScheduleDate ? "scheduled" : "published"
+    const status = saveAsDraft ? "draft" : (newScheduleDate ? "scheduled" : "published")
     const result = await createContentAction({
       type: newType,
       title: newTitle,
@@ -174,7 +174,7 @@ export function AdminContent() {
       url: newType === "external" ? newUrl : (newType === "video" ? newVideoUrl : undefined),
       thumbnailUrl: thumbnailUrl || undefined,
       status,
-      publishDate: newScheduleDate || undefined,
+      publishDate: saveAsDraft ? undefined : (newScheduleDate || undefined),
       premium: newIsPremium,
       requiredRank: newIsPremium ? newRequiredRank : "all",
     })
@@ -519,10 +519,7 @@ export function AdminContent() {
               <Button
                 variant="outline"
                 className="border-[#1B3022]/10 text-[#1B3022]/60 bg-transparent"
-                onClick={() => {
-                  setNewScheduleDate("")
-                  handleCreate()
-                }}
+                onClick={() => handleCreate(true)}
                 disabled={isSaving || !newTitle}
               >
                 {isSaving ? (
@@ -535,7 +532,7 @@ export function AdminContent() {
                 )}
               </Button>
               <Button
-                onClick={handleCreate}
+                onClick={() => handleCreate(false)}
                 className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] gap-2"
                 disabled={isSaving || !newTitle}
               >

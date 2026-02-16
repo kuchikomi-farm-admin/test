@@ -26,6 +26,13 @@ import type { Content, ContentType, ContentStatus, MemberRank } from "@/lib/type
 
 type TabKey = "articles" | "videos" | "external"
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ""
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+}
+
 function mapDbContent(c: Record<string, unknown>): Content {
   return {
     id: c.id as string,
@@ -34,7 +41,7 @@ function mapDbContent(c: Record<string, unknown>): Content {
     description: (c.description as string) || "",
     body: (c.body as string) || "",
     status: c.status as ContentStatus,
-    publishDate: (c.publish_date as string) || "",
+    publishDate: formatDate((c.publish_date as string) || ""),
     author: c.author_name as string,
     thumbnail: c.thumbnail_url as string | undefined,
     views: (c.views as number) || 0,

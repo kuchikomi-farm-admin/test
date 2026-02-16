@@ -30,9 +30,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import { useContentStore } from "@/lib/store/use-content-store"
-import { useUserStore } from "@/lib/store/use-user-store"
 import { toggleLike, toggleBookmark, getUserInteractions } from "@/app/actions/interactions"
+import { getContentById } from "@/app/actions/content"
+import type { Content, ContentType, ContentStatus, MemberRank } from "@/lib/types"
 
 /* ---------- Mock/Sample Data for Layout Demo (Fallbacks) ---------- */
 const sampleArticleBody = [
@@ -54,12 +54,40 @@ const relatedArticles = [
   { id: "art-3", title: "伝統工芸のDX：後継者不足を逆手に取ったブランド戦略", author: "山田 健一", readTime: "10分" },
 ]
 
-/* ---------- Component ---------- */
+/* ---------- Helpers ---------- */
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ""
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+}
+
+function mapDbContent(c: Record<string, unknown>): Content {
+  return {
+    id: c.id as string,
+    type: c.type as ContentType,
+    title: c.title as string,
+    description: (c.description as string) || "",
+    body: (c.body as string) || "",
+    status: c.status as ContentStatus,
+    publishDate: formatDate((c.publish_date as string) || ""),
+    author: c.author_name as string,
+    authorBio: (c.author_bio as string) || undefined,
+    thumbnail: (c.thumbnail_url as string) || undefined,
+    views: (c.views as number) || 0,
+    likes: (c.likes as number) || 0,
+    premium: (c.premium as boolean) || false,
+    requiredRank: (c.required_rank as MemberRank) || "all",
+    url: (c.url as string) || undefined,
+    duration: (c.duration as string) || undefined,
+  }
+}
+
 export default function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { contents, incrementViews } = useContentStore()
-  const content = contents.find(c => c.id === id)
 
+  const [content, setContent] = useState<Content | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [readProgress, setReadProgress] = useState(0)
   const [copied, setCopied] = useState(false)
@@ -71,15 +99,33 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     setMounted(true)
-    if (id) incrementViews(id)
+    if (!id) return
+
+    // DB からコンテンツを取得
+    getContentById(id)
+      .then((result) => {
+        if ("error" in result) {
+          setLoadError(result.error)
+        } else if (result.data) {
+          setContent(mapDbContent(result.data as Record<string, unknown>))
+        } else {
+          setLoadError("コンテンツが見つかりません")
+        }
+      })
+      .catch(() => {
+        setLoadError("コンテンツの読み込みに失敗しました")
+      })
+
     // DB からいいね・ブックマーク状態を取得
-    if (id) {
-      getUserInteractions(id).then((result) => {
+    getUserInteractions(id)
+      .then((result) => {
         if (result.liked !== undefined) setLiked(result.liked)
         if (result.bookmarked !== undefined) setBookmarked(result.bookmarked)
       })
-    }
-  }, [id, incrementViews])
+      .catch(() => {
+        // いいね・ブックマーク取得失敗は無視（コンテンツ表示に影響しない）
+      })
+  }, [id])
 
   const handleToggleLike = async () => {
     setLiked(!liked)
@@ -116,12 +162,29 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
     return () => clearInterval(timer)
   }, [isPlaying, content])
 
-  if (!mounted || !content) {
+  if (!mounted || (!content && !loadError)) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-[#1B3022]/10" />
           <p className="text-sm text-[#1B3022]/40">読み込み中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError || !content) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA]">
+        <AppHeader />
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <p className="text-sm text-[#1B3022]/50">{loadError || "コンテンツが見つかりません"}</p>
+          <Link href="/feed">
+            <Button variant="outline" className="gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              {"フィードに戻る"}
+            </Button>
+          </Link>
         </div>
       </div>
     )
