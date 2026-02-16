@@ -61,6 +61,70 @@ export async function getAdminUsers() {
   return { users }
 }
 
+// ──────── ダッシュボード統計 ────────
+export async function getDashboardStats() {
+  await requireAdmin()
+  const adminClient = createAdminClient()
+
+  // 全プロフィール取得
+  const { data: profiles } = await adminClient
+    .from("profiles")
+    .select("id, status, created_at")
+
+  const allUsers = profiles || []
+  const totalUsers = allUsers.length
+  const activeUsers = allUsers.filter((p) => p.status === "active").length
+  const activeRate = totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0
+
+  // 今月の新規登録
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const monthlyNewUsers = allUsers.filter((p) => p.created_at >= monthStart).length
+
+  // コンテンツ数
+  const { count: contentCount } = await adminClient
+    .from("contents")
+    .select("id", { count: "exact", head: true })
+
+  // 月別登録推移（直近6ヶ月）
+  const growthData = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+    const label = `${d.getMonth() + 1}月`
+    const total = allUsers.filter((p) => new Date(p.created_at) <= monthEnd).length
+    growthData.push({ month: label, total, invited: 0 })
+  }
+
+  // 今週の日別登録数
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - now.getDay())
+  weekStart.setHours(0, 0, 0, 0)
+  const dayLabels = ["日", "月", "火", "水", "木", "金", "土"]
+  const weeklyData = dayLabels.map((day, idx) => {
+    const dayStart = new Date(weekStart)
+    dayStart.setDate(weekStart.getDate() + idx)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayStart.getDate() + 1)
+    const registrations = allUsers.filter((p) => {
+      const c = new Date(p.created_at)
+      return c >= dayStart && c < dayEnd
+    }).length
+    return { day, registrations }
+  })
+
+  return {
+    stats: {
+      totalUsers,
+      activeRate,
+      monthlyNewUsers,
+      contentCount: contentCount || 0,
+    },
+    growthData,
+    weeklyData,
+  }
+}
+
 // ──────── ユーザーステータス更新 ────────
 export async function updateUserStatus(userId: string, newStatus: "active" | "pending") {
   await requireAdmin()

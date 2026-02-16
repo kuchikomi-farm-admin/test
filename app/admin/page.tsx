@@ -11,11 +11,11 @@ import { cn } from "@/lib/utils"
 import { BarChart3, Users, Gift, Send, FileText } from "lucide-react"
 
 const tabs = [
-  { id: "overview", label: "全体統計", icon: BarChart3 },
-  { id: "content", label: "コンテンツ管理", icon: FileText },
-  { id: "users", label: "ユーザー管理", icon: Users },
-  { id: "rewards", label: "特典管理", icon: Gift },
-  { id: "broadcast", label: "配信管理", icon: Send },
+  { id: "overview", label: "全体統計", icon: BarChart3, disabled: false },
+  { id: "content", label: "コンテンツ管理", icon: FileText, disabled: false },
+  { id: "users", label: "ユーザー管理", icon: Users, disabled: false },
+  { id: "rewards", label: "特典管理", icon: Gift, disabled: false },
+  { id: "broadcast", label: "配信管理", icon: Send, disabled: true },
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
@@ -42,16 +42,20 @@ export default function AdminPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => !tab.disabled && setActiveTab(tab.id)}
+                disabled={tab.disabled}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm whitespace-nowrap transition-colors",
-                  activeTab === tab.id
-                    ? "bg-[#1B3022] text-[#D4AF37]"
-                    : "text-[#1B3022]/50 hover:text-[#1B3022] hover:bg-[#1B3022]/5"
+                  tab.disabled
+                    ? "text-[#1B3022]/20 cursor-not-allowed"
+                    : activeTab === tab.id
+                      ? "bg-[#1B3022] text-[#D4AF37]"
+                      : "text-[#1B3022]/50 hover:text-[#1B3022] hover:bg-[#1B3022]/5"
                 )}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
+                {tab.disabled && <span className="text-[10px] ml-1 opacity-60">{"(開発中)"}</span>}
               </button>
             )
           })}

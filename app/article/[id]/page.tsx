@@ -548,7 +548,7 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
           ) : null}
         </article>
 
-        {/* Floating action bar - note.jp style */}
+        {/* Floating action bar */}
         <div className="sticky bottom-6 z-50 flex items-center justify-center">
           <div className="flex items-center gap-1 bg-[#F8F9FA] border border-[#1B3022]/10 rounded-full px-2 py-1.5 shadow-lg">
             <button
@@ -564,14 +564,6 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
             <div className="w-px h-5 bg-[#1B3022]/10" />
             <button
               type="button"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-[#1B3022]/50 hover:bg-[#1B3022]/5 transition-colors"
-            >
-              <MessageCircle className="w-[18px] h-[18px]" />
-              <span className="text-xs">{"8"}</span>
-            </button>
-            <div className="w-px h-5 bg-[#1B3022]/10" />
-            <button
-              type="button"
               onClick={handleToggleBookmark}
               className={cn(
                 "flex items-center gap-1.5 px-4 py-2 rounded-full text-sm transition-all",
@@ -579,14 +571,6 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
               )}
             >
               <Bookmark className={cn("w-[18px] h-[18px]", bookmarked && "fill-current")} />
-            </button>
-            <div className="w-px h-5 bg-[#1B3022]/10" />
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm text-[#1B3022]/50 hover:bg-[#1B3022]/5 transition-colors"
-            >
-              <Share2 className="w-[18px] h-[18px]" />
             </button>
           </div>
         </div>
