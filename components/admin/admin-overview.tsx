@@ -78,13 +78,13 @@ export function AdminOverview() {
               total: { label: "総登録者数", color: "#1B3022" },
               invited: { label: "招待経由", color: "#D4AF37" },
             }}
-            className="h-[400px]"
+            className="h-[300px]"
           >
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.growthData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1B302210" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#1B302240" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#1B302240" />
+                <YAxis tick={{ fontSize: 12 }} stroke="#1B302240" allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area
                   type="monotone"
@@ -115,13 +115,13 @@ export function AdminOverview() {
             config={{
               registrations: { label: "新規登録", color: "#D4AF37" },
             }}
-            className="h-[280px]"
+            className="h-[300px]"
           >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.weeklyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1B302210" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="#1B302240" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#1B302240" />
+                <YAxis tick={{ fontSize: 12 }} stroke="#1B302240" allowDecimals={false} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="registrations" fill="#D4AF37" radius={[4, 4, 0, 0]} />
               </BarChart>

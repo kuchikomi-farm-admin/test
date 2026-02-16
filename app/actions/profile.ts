@@ -214,6 +214,30 @@ export async function getSlotUnlockConditions() {
   }
 }
 
+// ──────── 報酬マイルストーン取得 ────────
+export async function getRewardMilestones() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "未認証です" }
+
+  const { data: rewards, error } = await supabase
+    .from("rewards")
+    .select("required_referrals, title, description, icon")
+    .eq("status", "active")
+    .order("required_referrals", { ascending: true })
+
+  if (error) return { error: "報酬情報の取得に失敗しました" }
+
+  return {
+    milestones: (rewards || []).map((r) => ({
+      target: r.required_referrals,
+      label: `${r.required_referrals}人達成`,
+      reward: r.title,
+      icon: r.icon,
+    })),
+  }
+}
+
 // ──────── ログイン履歴取得 ────────
 export async function getLoginHistory() {
   const supabase = await createClient()

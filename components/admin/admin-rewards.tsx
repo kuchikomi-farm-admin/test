@@ -13,48 +13,78 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Gift, Star, Crown, Check, Edit2, X } from "lucide-react"
-import { useRewardStore } from "@/lib/store/use-reward-store"
-import { useAdminUserStore } from "@/lib/store/use-admin-user-store"
 import { cn } from "@/lib/utils"
+import { getAdminRewards, updateAdminReward } from "@/app/actions/admin"
 
-const FIXED_TIERS = [
-  { requiredReferrals: 10, icon: Gift, label: "10人達成", color: "bg-[#D4AF37]/20 text-[#D4AF37]" },
-  { requiredReferrals: 100, icon: Star, label: "100人達成", color: "bg-[#D4AF37]/30 text-[#D4AF37]" },
-  { requiredReferrals: 1000, icon: Crown, label: "1000人達成", color: "bg-[#D4AF37]/40 text-[#D4AF37]" },
-]
+const TIER_ICONS: Record<number, { icon: typeof Gift; color: string }> = {
+  10: { icon: Gift, color: "bg-[#D4AF37]/20 text-[#D4AF37]" },
+  100: { icon: Star, color: "bg-[#D4AF37]/30 text-[#D4AF37]" },
+  1000: { icon: Crown, color: "bg-[#D4AF37]/40 text-[#D4AF37]" },
+}
+
+interface RewardData {
+  id: string
+  title: string
+  description: string
+  requiredReferrals: number
+  icon: string
+  status: string
+  achievedCount: number
+}
+
+interface AchieverData {
+  id: string
+  name: string
+  referrals: number
+}
 
 export function AdminRewards() {
-  const { rewards, updateReward } = useRewardStore()
-  const { users } = useAdminUserStore()
   const [mounted, setMounted] = useState(false)
+  const [rewards, setRewards] = useState<RewardData[]>([])
+  const [achievers, setAchievers] = useState<AchieverData[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editDesc, setEditDesc] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    getAdminRewards()
+      .then((result) => {
+        if ("rewards" in result) {
+          setRewards(result.rewards)
+          setAchievers(result.achievers)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   if (!mounted) return null
 
-  // 固定ティアに対応するrewardを取得
-  const tierRewards = FIXED_TIERS.map((tier) => {
-    const reward = rewards.find(r => r.requiredReferrals === tier.requiredReferrals)
-    const achievedCount = users.filter(u => u.referrals >= tier.requiredReferrals).length
-    return {
-      ...tier,
-      reward,
-      achievedCount,
-    }
-  })
+  if (rewards.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-sm text-[#1B3022]/40">読み込み中...</p>
+      </div>
+    )
+  }
 
-  const handleStartEdit = (reward: { id: string; title: string; description: string }) => {
+  const handleStartEdit = (reward: RewardData) => {
     setEditingId(reward.id)
     setEditTitle(reward.title)
     setEditDesc(reward.description)
   }
 
-  const handleSaveEdit = (id: string) => {
+  const handleSaveEdit = async (id: string) => {
     if (!editTitle) return
-    updateReward(id, { title: editTitle, description: editDesc })
+    setSaving(true)
+    const result = await updateAdminReward(id, editTitle, editDesc)
+    if (!("error" in result)) {
+      setRewards((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, title: editTitle, description: editDesc } : r))
+      )
+    }
+    setSaving(false)
     setEditingId(null)
   }
 
@@ -66,46 +96,44 @@ export function AdminRewards() {
         <p className="text-xs text-[#1B3022]/40">{"3段階の固定マイルストーン（10人 / 100人 / 1000人）の内容を編集できます。"}</p>
 
         <div className="space-y-4">
-          {tierRewards.map((tier) => {
-            const Icon = tier.icon
-            const isEditing = editingId === tier.reward?.id
+          {rewards.map((reward) => {
+            const tierConfig = TIER_ICONS[reward.requiredReferrals] || { icon: Gift, color: "bg-[#D4AF37]/20 text-[#D4AF37]" }
+            const Icon = tierConfig.icon
+            const isEditing = editingId === reward.id
 
             return (
               <div
-                key={tier.requiredReferrals}
+                key={reward.id}
                 className="rounded-xl border border-[#1B3022]/8 bg-background p-5 space-y-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className={cn("shrink-0 w-12 h-12 rounded-full flex items-center justify-center", tier.color)}>
+                  <div className={cn("shrink-0 w-12 h-12 rounded-full flex items-center justify-center", tierConfig.color)}>
                     <Icon className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
-                      <h3 className="text-base font-medium text-[#1B3022]">{tier.label}</h3>
+                      <h3 className="text-base font-medium text-[#1B3022]">{`${reward.requiredReferrals}人達成`}</h3>
                       <Badge variant="outline" className="border-[#1B3022]/10 text-[#1B3022]/60">
-                        {`${tier.requiredReferrals}名招待`}
+                        {`${reward.requiredReferrals}名招待`}
                       </Badge>
                     </div>
-                    {tier.reward && !isEditing && (
+                    {!isEditing && (
                       <div className="mt-1.5">
-                        <p className="text-sm text-[#1B3022]/80">{tier.reward.title}</p>
-                        <p className="text-xs text-[#1B3022]/40 mt-0.5">{tier.reward.description}</p>
+                        <p className="text-sm text-[#1B3022]/80">{reward.title}</p>
+                        <p className="text-xs text-[#1B3022]/40 mt-0.5">{reward.description}</p>
                       </div>
-                    )}
-                    {!tier.reward && !isEditing && (
-                      <p className="text-xs text-[#1B3022]/30 mt-1">{"未設定"}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-center">
-                      <p className="text-lg font-serif text-[#1B3022]">{tier.achievedCount}</p>
+                      <p className="text-lg font-serif text-[#1B3022]">{reward.achievedCount}</p>
                       <p className="text-[10px] text-[#1B3022]/40">{"達成者"}</p>
                     </div>
-                    {tier.reward && !isEditing && (
+                    {!isEditing && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleStartEdit(tier.reward!)}
+                        onClick={() => handleStartEdit(reward)}
                         className="text-[#1B3022]/40 hover:text-[#1B3022]"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -115,7 +143,7 @@ export function AdminRewards() {
                 </div>
 
                 {/* Inline edit form */}
-                {isEditing && tier.reward && (
+                {isEditing && (
                   <div className="space-y-3 pt-3 border-t border-[#1B3022]/8">
                     <div className="space-y-1.5">
                       <label className="text-[10px] text-[#1B3022]/40 uppercase tracking-wider">{"特典名"}</label>
@@ -145,11 +173,12 @@ export function AdminRewards() {
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => handleSaveEdit(tier.reward!.id)}
+                        onClick={() => handleSaveEdit(reward.id)}
+                        disabled={saving}
                         className="bg-[#1B3022] text-[#D4AF37]"
                       >
                         <Check className="w-4 h-4 mr-1" />
-                        {"保存"}
+                        {saving ? "保存中..." : "保存"}
                       </Button>
                     </div>
                   </div>
@@ -173,37 +202,41 @@ export function AdminRewards() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.filter(u => u.referrals >= 10).map((user) => {
-                const highestTier = [...FIXED_TIERS]
-                  .filter(t => user.referrals >= t.requiredReferrals)
-                  .sort((a, b) => b.requiredReferrals - a.requiredReferrals)[0]
+              {achievers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center py-12 text-sm text-[#1B3022]/30">
+                    {"達成者はまだいません"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                achievers.map((user) => {
+                  const highestTier = [1000, 100, 10].find((t) => user.referrals >= t)
+                  const tierConfig = highestTier ? TIER_ICONS[highestTier] : null
+                  const matchingReward = rewards.find((r) => r.requiredReferrals === highestTier)
 
-                if (!highestTier) return null
-
-                const matchingReward = rewards.find(r => r.requiredReferrals === highestTier.requiredReferrals)
-
-                return (
-                  <TableRow key={user.id} className="hover:bg-[#1B3022]/2 border-b border-[#1B3022]/5">
-                    <TableCell className="py-4 px-6">
-                      <p className="text-sm font-medium text-[#1B3022]">{user.name}</p>
-                      <p className="text-[10px] text-[#1B3022]/30">{`${user.referrals}名招待`}</p>
-                    </TableCell>
-                    <TableCell className="py-4 px-6">
-                      <div className="flex items-center gap-2">
-                        <Gift className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span className="text-xs text-[#1B3022]/60">
-                          {matchingReward?.title || highestTier.label}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right py-4 px-6">
-                      <Badge className="bg-[#1B3022]/10 text-[#1B3022] hover:bg-[#1B3022]/10 text-[10px]">
-                        {"付与待機中"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+                  return (
+                    <TableRow key={user.id} className="hover:bg-[#1B3022]/2 border-b border-[#1B3022]/5">
+                      <TableCell className="py-4 px-6">
+                        <p className="text-sm font-medium text-[#1B3022]">{user.name}</p>
+                        <p className="text-[10px] text-[#1B3022]/30">{`${user.referrals}名招待`}</p>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <Gift className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <span className="text-xs text-[#1B3022]/60">
+                            {matchingReward?.title || `${highestTier}人達成`}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right py-4 px-6">
+                        <Badge className="bg-[#1B3022]/10 text-[#1B3022] hover:bg-[#1B3022]/10 text-[10px]">
+                          {"付与待機中"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
             </TableBody>
           </Table>
         </div>

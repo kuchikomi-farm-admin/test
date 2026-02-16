@@ -5,30 +5,19 @@ import { AppHeader } from "@/components/app-header"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Copy, Check, Link2, Gift, Users, Star, Crown, Lock, Unlock, Eye } from "lucide-react"
-import { getMyInviteCode, getReferralStats, getProfile, generateInviteCode, getInviteSlots, getSlotUnlockConditions } from "@/app/actions/profile"
+import { getMyInviteCode, getReferralStats, getProfile, generateInviteCode, getInviteSlots, getSlotUnlockConditions, getRewardMilestones } from "@/app/actions/profile"
 
-const milestones = [
-  {
-    target: 10,
-    label: "10人達成",
-    reward: "非公開有料コンテンツ（1万円相当）",
-    icon: Gift,
-    color: "bg-[#D4AF37]/20 text-[#D4AF37]",
-  },
-  {
-    target: 100,
-    label: "100人達成",
-    reward: "10万円級プレミアムサロン参加",
-    icon: Star,
-    color: "bg-[#D4AF37]/30 text-[#D4AF37]",
-  },
-  {
-    target: 1000,
-    label: "1000人達成",
-    reward: "主宰者・一流人材との1on1予約",
-    icon: Crown,
-    color: "bg-[#D4AF37]/40 text-[#D4AF37]",
-  },
+const ICON_MAP: Record<string, typeof Gift> = { Gift, Star, Crown }
+const COLOR_MAP: Record<number, string> = {
+  10: "bg-[#D4AF37]/20 text-[#D4AF37]",
+  100: "bg-[#D4AF37]/30 text-[#D4AF37]",
+  1000: "bg-[#D4AF37]/40 text-[#D4AF37]",
+}
+
+const DEFAULT_MILESTONES = [
+  { target: 10, label: "10人達成", reward: "非公開有料コンテンツ（1万円相当）", icon: "Gift" },
+  { target: 100, label: "100人達成", reward: "10万円級プレミアムサロン参加", icon: "Star" },
+  { target: 1000, label: "1000人達成", reward: "主宰者・一流人材との1on1予約", icon: "Crown" },
 ]
 
 export default function MyPage() {
@@ -42,6 +31,7 @@ export default function MyPage() {
   const [memberId, setMemberId] = useState("")
   const [inviteSlots, setInviteSlots] = useState({ initialSlots: 2, bonusSlots: 0, usedSlots: 0 })
   const [unlockConditions, setUnlockConditions] = useState<{ key: string; label: string; done: boolean }[]>([])
+  const [milestones, setMilestones] = useState(DEFAULT_MILESTONES)
   const [generating, setGenerating] = useState(false)
   const [justGenerated, setJustGenerated] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
@@ -70,6 +60,9 @@ export default function MyPage() {
     getSlotUnlockConditions().then((result) => {
       if ("conditions" in result) setUnlockConditions(result.conditions)
     })
+    getRewardMilestones().then((result) => {
+      if ("milestones" in result && result.milestones.length > 0) setMilestones(result.milestones)
+    }).catch(() => {})
   }, [])
 
   const remainingSlots = inviteSlots.initialSlots + inviteSlots.bonusSlots - inviteSlots.usedSlots
@@ -232,25 +225,32 @@ export default function MyPage() {
             <h2 className="font-serif text-lg text-[#1B3022]">{"報酬ロードマップ"}</h2>
           </div>
 
-          <div className="flex items-center gap-4 p-4 rounded-xl bg-[#1B3022]/5">
-            <div className="text-center">
-              <p className="text-3xl font-serif text-[#1B3022]">{referralCount}</p>
-              <p className="text-xs text-[#1B3022]/40">{"紹介数"}</p>
-            </div>
-            <div className="h-10 w-px bg-[#1B3022]/10" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-[#1B3022]/60">{"次の目標: 100人"}</span>
-                <span className="text-[#D4AF37] font-medium">{`${referralCount}%`}</span>
+          {(() => {
+            const nextMilestone = milestones.find((m) => referralCount < m.target) || milestones[milestones.length - 1]
+            const progress = nextMilestone ? Math.min((referralCount / nextMilestone.target) * 100, 100) : 100
+            return (
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-[#1B3022]/5">
+                <div className="text-center">
+                  <p className="text-3xl font-serif text-[#1B3022]">{referralCount}</p>
+                  <p className="text-xs text-[#1B3022]/40">{"紹介数"}</p>
+                </div>
+                <div className="h-10 w-px bg-[#1B3022]/10" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="text-[#1B3022]/60">{`次の目標: ${nextMilestone.target}人`}</span>
+                    <span className="text-[#D4AF37] font-medium">{`${Math.round(progress)}%`}</span>
+                  </div>
+                  <Progress value={progress} className="h-2 bg-[#1B3022]/10 [&>div]:bg-[#D4AF37]" />
+                </div>
               </div>
-              <Progress value={(referralCount / 100) * 100} className="h-2 bg-[#1B3022]/10 [&>div]:bg-[#D4AF37]" />
-            </div>
-          </div>
+            )
+          })()}
 
           <div className="space-y-3">
             {milestones.map((m) => {
               const achieved = referralCount >= m.target
-              const Icon = m.icon
+              const Icon = ICON_MAP[m.icon] || Gift
+              const color = COLOR_MAP[m.target] || "bg-[#D4AF37]/20 text-[#D4AF37]"
               return (
                 <div
                   key={m.target}
@@ -259,7 +259,7 @@ export default function MyPage() {
                     : "border-[#1B3022]/8 bg-background"
                     }`}
                 >
-                  <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${m.color}`}>
+                  <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">

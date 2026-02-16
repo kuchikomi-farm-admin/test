@@ -125,6 +125,98 @@ export async function getDashboardStats() {
   }
 }
 
+// ──────── 特典一覧取得（3固定ティア自動作成付き） ────────
+const DEFAULT_TIERS = [
+  { required_referrals: 10, title: "非公開有料コンテンツ（1万円相当）", description: "10人招待達成の特典", icon: "Gift" },
+  { required_referrals: 100, title: "10万円級プレミアムサロン参加", description: "100人招待達成の特典", icon: "Star" },
+  { required_referrals: 1000, title: "主宰者・一流人材との1on1予約", description: "1000人招待達成の特典", icon: "Crown" },
+]
+
+export async function getAdminRewards() {
+  await requireAdmin()
+  const adminClient = createAdminClient()
+
+  // 既存の特典を取得
+  let { data: rewards } = await adminClient
+    .from("rewards")
+    .select("*")
+    .order("required_referrals", { ascending: true })
+
+  // 3固定ティアが存在しなければ自動作成
+  if (!rewards || rewards.length === 0) {
+    for (const tier of DEFAULT_TIERS) {
+      await adminClient.from("rewards").insert(tier)
+    }
+    const result = await adminClient
+      .from("rewards")
+      .select("*")
+      .order("required_referrals", { ascending: true })
+    rewards = result.data || []
+  }
+
+  // 各ティアの達成者数を計算
+  const { data: allReferrals } = await adminClient
+    .from("referrals")
+    .select("referrer_id, registered_at")
+
+  // referrer_id ごとの登録完了数を集計
+  const referralCounts: Record<string, number> = {}
+  for (const r of allReferrals || []) {
+    if (r.registered_at) {
+      referralCounts[r.referrer_id] = (referralCounts[r.referrer_id] || 0) + 1
+    }
+  }
+
+  const rewardsWithStats = rewards.map((reward) => {
+    const achievedCount = Object.values(referralCounts).filter(
+      (count) => count >= reward.required_referrals
+    ).length
+    return {
+      id: reward.id,
+      title: reward.title,
+      description: reward.description,
+      requiredReferrals: reward.required_referrals,
+      icon: reward.icon,
+      status: reward.status,
+      achievedCount,
+    }
+  })
+
+  // 達成者の詳細リスト（10人以上の招待実績があるユーザー）
+  const { data: profiles } = await adminClient
+    .from("profiles")
+    .select("id, display_name")
+
+  const profileMap = new Map((profiles || []).map((p) => [p.id, p.display_name || "(未設定)"]))
+
+  const achievers = Object.entries(referralCounts)
+    .filter(([, count]) => count >= 10)
+    .map(([userId, count]) => ({
+      id: userId,
+      name: profileMap.get(userId) || "(未設定)",
+      referrals: count,
+    }))
+    .sort((a, b) => b.referrals - a.referrals)
+
+  return { rewards: rewardsWithStats, achievers }
+}
+
+// ──────── 特典内容更新 ────────
+export async function updateAdminReward(rewardId: string, title: string, description: string) {
+  await requireAdmin()
+  const adminClient = createAdminClient()
+
+  const { error } = await adminClient
+    .from("rewards")
+    .update({ title, description })
+    .eq("id", rewardId)
+
+  if (error) return { error: "特典の更新に失敗しました" }
+
+  revalidatePath("/admin")
+  return { success: true }
+}
+
 // ──────── ユーザーステータス更新 ────────
 export async function updateUserStatus(userId: string, newStatus: "active" | "pending") {
   await requireAdmin()
