@@ -31,28 +31,8 @@ import {
 import { cn } from "@/lib/utils"
 
 import { toggleLike, toggleBookmark, getUserInteractions } from "@/app/actions/interactions"
-import { getContentById } from "@/app/actions/content"
+import { getContentById, getPublishedContents } from "@/app/actions/content"
 import type { Content, ContentType, ContentStatus, MemberRank } from "@/lib/types"
-
-/* ---------- Mock/Sample Data for Layout Demo (Fallbacks) ---------- */
-const sampleArticleBody = [
-  "地方創生の文脈で「関係人口」という言葉が使われるようになって久しい。しかし、その実態を正確に把握し、戦略的に活用している自治体はまだ少ない。本稿では、全国47都道府県の移住相談データと、独自に実施した3,000人規模のアンケート調査の結果を交差させ、「関係人口」の設計図を描き出す。",
-  "heading:第一章：数字が語る変化の兆し",
-  "2024年の地方移住相談件数は前年比23%増の約58万件に達した。しかし、より注目すべきは「完全移住」ではなく「二拠点居住」を希望する層が全体の41%を占めるようになった点だ。",
-  "quote:「移住」ではなく「関わり続ける」ことが、地方と人との新しい関係性の核心である。",
-  "heading:第二章：成功する自治体の共通パターン",
-  "関係人口の獲得に成功している自治体には、いくつかの共通するパターンが見られる。第一に、「お試し移住」プログラムの質が高い。",
-]
-
-const relatedVideos = [
-  { id: "1", title: "消えゆく集落、再生の灯火", thumbnail: "/images/documentary-1.jpg", duration: "48:32", author: "TheJapanLocalMedia Documentary", views: "2.4K" },
-  { id: "2", title: "海が結ぶ未来 - 漁村とテクノロジーの融合", thumbnail: "/images/documentary-2.jpg", duration: "35:18", author: "TheJapanLocalMedia Documentary", views: "1.8K" },
-]
-
-const relatedArticles = [
-  { id: "art-2", title: "温泉×ワーケーション：月商3000万を実現した旅館の戦略", author: "鈴木 理恵", readTime: "8分" },
-  { id: "art-3", title: "伝統工芸のDX：後継者不足を逆手に取ったブランド戦略", author: "山田 健一", readTime: "10分" },
-]
 
 /* ---------- Helpers ---------- */
 function formatDate(dateStr: string): string {
@@ -96,6 +76,7 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
   const [liked, setLiked] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [muted, setMuted] = useState(false)
+  const [relatedContents, setRelatedContents] = useState<Content[]>([])
 
   useEffect(() => {
     setMounted(true)
@@ -116,15 +97,26 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
         setLoadError("コンテンツの読み込みに失敗しました")
       })
 
+    // DB から関連コンテンツを取得（現在のコンテンツを除外）
+    getPublishedContents()
+      .then((result) => {
+        if ("data" in result && result.data) {
+          setRelatedContents(
+            result.data
+              .filter((c: Record<string, unknown>) => c.id !== id)
+              .map((c: Record<string, unknown>) => mapDbContent(c))
+          )
+        }
+      })
+      .catch(() => {})
+
     // DB からいいね・ブックマーク状態を取得
     getUserInteractions(id)
       .then((result) => {
         if (result.liked !== undefined) setLiked(result.liked)
         if (result.bookmarked !== undefined) setBookmarked(result.bookmarked)
       })
-      .catch(() => {
-        // いいね・ブックマーク取得失敗は無視（コンテンツ表示に影響しない）
-      })
+      .catch(() => {})
   }, [id])
 
   const handleToggleLike = async () => {
@@ -387,32 +379,36 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
             </div>
 
             {/* Sidebar - Related Videos */}
-            <aside className="lg:w-[360px] shrink-0 space-y-4">
-              <h3 className="text-sm font-medium text-[#1B3022]/60 tracking-wider">{"関連動画"}</h3>
-              <div className="space-y-3">
-                {relatedVideos.map((video) => (
-                  <Link
-                    key={video.id}
-                    href={`/article/${video.id}`}
-                    className="flex gap-3 group"
-                  >
-                    <div className="relative w-[168px] shrink-0 aspect-video rounded-lg overflow-hidden bg-[#1B3022]/10">
-                      <Image src={video.thumbnail || "/placeholder.svg"} alt={video.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
-                      <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
-                        {video.duration}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0 py-0.5">
-                      <h4 className="text-sm text-[#1B3022] leading-snug line-clamp-2 group-hover:text-[#D4AF37] transition-colors">
-                        {video.title}
-                      </h4>
-                      <p className="text-xs text-[#1B3022]/40 mt-1.5">{video.author}</p>
-                      <p className="text-xs text-[#1B3022]/30">{`${video.views}回視聴`}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </aside>
+            {relatedContents.length > 0 && (
+              <aside className="lg:w-[360px] shrink-0 space-y-4">
+                <h3 className="text-sm font-medium text-[#1B3022]/60 tracking-wider">{"関連動画"}</h3>
+                <div className="space-y-3">
+                  {relatedContents.slice(0, 5).map((video) => (
+                    <Link
+                      key={video.id}
+                      href={`/article/${video.id}`}
+                      className="flex gap-3 group"
+                    >
+                      <div className="relative w-[168px] shrink-0 aspect-video rounded-lg overflow-hidden bg-[#1B3022]/10">
+                        <Image src={video.thumbnail || "/placeholder.svg"} alt={video.title} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
+                        {video.duration && (
+                          <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
+                            {video.duration}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 py-0.5">
+                        <h4 className="text-sm text-[#1B3022] leading-snug line-clamp-2 group-hover:text-[#D4AF37] transition-colors">
+                          {video.title}
+                        </h4>
+                        <p className="text-xs text-[#1B3022]/40 mt-1.5">{video.author}</p>
+                        <p className="text-xs text-[#1B3022]/30">{`${video.views.toLocaleString()}回視聴`}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </aside>
+            )}
           </div>
         </div>
       </div>
@@ -549,11 +545,7 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
                 )
               })
             )
-          ) : (
-            <p className="text-[#1B3022]/75 leading-[2] text-[15px] md:text-base font-light">
-              {sampleArticleBody.map((p, i) => <span key={i} className="block mb-4">{p}</span>)}
-            </p>
-          )}
+          ) : null}
         </article>
 
         {/* Floating action bar - note.jp style */}
@@ -621,30 +613,32 @@ export default function ArticlePage({ params }: { params: Promise<{ id: string }
         </div>
 
         {/* Related Articles */}
-        <div className="mt-12 mb-16 space-y-5">
-          <h3 className="text-sm font-medium text-[#1B3022]/50 tracking-wider">{"この記事を読んだ方へ"}</h3>
-          <div className="space-y-1">
-            {relatedArticles.map((article) => (
-              <Link
-                key={article.id}
-                href={`/article/${article.id}`}
-                className="group flex items-center gap-4 py-4 border-b border-[#1B3022]/5 last:border-0"
-              >
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm text-[#1B3022] leading-relaxed group-hover:text-[#D4AF37] transition-colors text-pretty">
-                    {article.title}
-                  </h4>
-                  <div className="flex items-center gap-2 mt-1.5 text-xs text-[#1B3022]/35">
-                    <span>{article.author}</span>
-                    <span>{" / "}</span>
-                    <span>{article.readTime}</span>
+        {relatedContents.length > 0 && (
+          <div className="mt-12 mb-16 space-y-5">
+            <h3 className="text-sm font-medium text-[#1B3022]/50 tracking-wider">{"この記事を読んだ方へ"}</h3>
+            <div className="space-y-1">
+              {relatedContents.slice(0, 5).map((article) => (
+                <Link
+                  key={article.id}
+                  href={`/article/${article.id}`}
+                  className="group flex items-center gap-4 py-4 border-b border-[#1B3022]/5 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm text-[#1B3022] leading-relaxed group-hover:text-[#D4AF37] transition-colors text-pretty">
+                      {article.title}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1.5 text-xs text-[#1B3022]/35">
+                      <span>{article.author}</span>
+                      <span>{" / "}</span>
+                      <span>{article.publishDate}</span>
+                    </div>
                   </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#1B3022]/15 group-hover:text-[#D4AF37] transition-colors shrink-0" />
-              </Link>
-            ))}
+                  <ChevronRight className="w-4 h-4 text-[#1B3022]/15 group-hover:text-[#D4AF37] transition-colors shrink-0" />
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
     </div>
