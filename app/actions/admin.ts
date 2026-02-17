@@ -96,21 +96,18 @@ export async function getDashboardStats() {
     growthData.push({ month: label, total, invited: 0 })
   }
 
-  // 今週の日別登録数
-  const weekStart = new Date(now)
-  weekStart.setDate(now.getDate() - now.getDay())
-  weekStart.setHours(0, 0, 0, 0)
-  const dayLabels = ["日", "月", "火", "水", "木", "金", "土"]
-  const weeklyData = dayLabels.map((day, idx) => {
-    const dayStart = new Date(weekStart)
-    dayStart.setDate(weekStart.getDate() + idx)
+  // 当日を含む過去7日間の日別登録数
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"]
+  const weeklyData = Array.from({ length: 7 }, (_, i) => {
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i)
     const dayEnd = new Date(dayStart)
     dayEnd.setDate(dayStart.getDate() + 1)
     const registrations = allUsers.filter((p) => {
       const c = new Date(p.created_at)
       return c >= dayStart && c < dayEnd
     }).length
-    return { day, registrations }
+    const label = i === 6 ? "今日" : `${dayStart.getMonth() + 1}/${dayStart.getDate()}(${dayNames[dayStart.getDay()]})`
+    return { day: label, registrations }
   })
 
   return {
