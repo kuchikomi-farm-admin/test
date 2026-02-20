@@ -165,6 +165,36 @@ export async function requestPasswordReset(email: string) {
   return { success: true }
 }
 
+// ──────── 審査質問送信（OAuth 新規登録後） ────────
+export async function submitScreeningAnswer(answer: string) {
+  if (!answer || answer.trim().length === 0) {
+    return { error: "審査質問への回答を入力してください" }
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: "認証されていません" }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ screening_answer: answer.trim() })
+    .eq("id", user.id)
+
+  if (error) {
+    return { error: "送信中にエラーが発生しました" }
+  }
+
+  await supabase.auth.signOut()
+
+  return { success: true }
+}
+
 // ──────── パスワード変更 ────────
 export async function changePassword(input: ChangePasswordInput) {
   const parsed = changePasswordSchema.safeParse(input)

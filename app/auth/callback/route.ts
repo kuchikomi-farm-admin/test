@@ -5,6 +5,7 @@ import { NextResponse } from "next/server"
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
+  const inviteCode = searchParams.get("invite_code")
 
   if (code) {
     const cookieStore = await cookies()
@@ -32,10 +33,15 @@ export async function GET(request: Request) {
     const { data: { session } } = await supabase.auth.exchangeCodeForSession(code)
 
     if (session?.user) {
+      // 招待コードがある場合（OAuth 新規登録）→ 後付けリンク
+      if (inviteCode) {
+        await supabase.rpc("link_invite_code", { input_code: inviteCode })
+      }
+
       // プロフィールのステータスを確認
       const { data: profile } = await supabase
         .from("profiles")
-        .select("status")
+        .select("status, screening_answer")
         .eq("id", session.user.id)
         .single()
 
@@ -52,7 +58,12 @@ export async function GET(request: Request) {
         )
       }
 
-      // pending → ゲートウェイへ + 承認待ちメッセージ
+      // pending — 審査質問が未入力（OAuth 新規登録）→ 審査質問ページへ
+      if (!profile?.screening_answer) {
+        return NextResponse.redirect(`${origin}/register/complete`)
+      }
+
+      // pending（審査質問入力済み）→ ゲートウェイへ + 承認待ちメッセージ
       await supabase.auth.signOut()
       return NextResponse.redirect(
         `${origin}/?message=${encodeURIComponent("メール認証が完了しました。管理者の承認をお待ちください。")}`

@@ -426,6 +426,10 @@ export interface Database {
         Args: Record<string, never>
         Returns: { code?: string; error?: string }
       }
+      link_invite_code: {
+        Args: { input_code: string }
+        Returns: { success: boolean; message: string }
+      }
     }
     Enums: {
       member_rank: MemberRank
