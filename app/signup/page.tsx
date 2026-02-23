@@ -5,7 +5,7 @@ import React, { Suspense } from "react"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,17 +14,18 @@ import { Eye, EyeOff, UserPlus, CheckCircle2 } from "lucide-react"
 import { signUp, verifyInviteCode } from "@/app/actions/auth"
 import { createClient } from "@/lib/supabase/client"
 
-export default function RegisterPage() {
+export default function SignupPage() {
   return (
     <Suspense>
-      <RegisterForm />
+      <SignupForm />
     </Suspense>
   )
 }
 
-function RegisterForm() {
+function SignupForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const codeFromUrl = searchParams.get("code") || ""
+  const ref = searchParams.get("ref") || ""
 
   const [formData, setFormData] = useState({
     email: "",
@@ -32,29 +33,34 @@ function RegisterForm() {
     lastName: "",
     firstName: "",
     question: "",
-    inviteCode: codeFromUrl,
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [inviteVerified, setInviteVerified] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(true)
   const [error, setError] = useState("")
   const [referrerName, setReferrerName] = useState("")
 
-  // Verify invite code from URL on mount
+  // Verify ref code on mount — redirect to / if invalid or missing
   useEffect(() => {
-    if (codeFromUrl) {
-      verifyInviteCode(codeFromUrl).then((result) => {
-        if (result.valid) {
-          setInviteVerified(true)
-          if (result.referrer_name) {
-            setReferrerName(result.referrer_name)
-          }
-        }
-      })
+    if (!ref) {
+      router.replace("/")
+      return
     }
-  }, [codeFromUrl])
+
+    setIsVerifying(true)
+    verifyInviteCode(ref).then((result) => {
+      if (result.valid) {
+        setIsVerifying(false)
+        if (result.referrer_name) {
+          setReferrerName(result.referrer_name)
+        }
+      } else {
+        router.replace("/")
+      }
+    })
+  }, [ref, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,7 +73,7 @@ function RegisterForm() {
       email: formData.email,
       password: formData.password,
       question: formData.question,
-      inviteCode: formData.inviteCode,
+      ref,
     })
 
     setIsSubmitting(false)
@@ -84,17 +90,32 @@ function RegisterForm() {
     setError("")
     setIsGoogleLoading(true)
     const supabase = createClient()
-    const inviteCode = formData.inviteCode || codeFromUrl
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback${inviteCode ? `?invite_code=${encodeURIComponent(inviteCode)}` : ""}`,
+        redirectTo: `${window.location.origin}/auth/callback${ref ? `?invite_code=${encodeURIComponent(ref)}` : ""}`,
       },
     })
     if (error) {
       setError("Google認証に失敗しました")
       setIsGoogleLoading(false)
     }
+  }
+
+  // Show loading spinner while verifying
+  if (isVerifying) {
+    return (
+      <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/images/hero-gateway.jpg" alt="" fill className="object-cover" priority />
+          <div className="absolute inset-0 bg-[#1B3022]/85" />
+        </div>
+        <div className="relative z-10 text-center">
+          <div className="w-8 h-8 border-2 border-[#D4AF37]/30 border-t-[#D4AF37] rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-sm text-[#F8F9FA]/60">{"招待リンクを確認中..."}</p>
+        </div>
+      </div>
+    )
   }
 
   if (isComplete) {
@@ -179,26 +200,8 @@ function RegisterForm() {
           </div>
         )}
 
-        {/* Form */}
+        {/* Form — no invite code input field */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Invite Code (if not from URL) */}
-          {!codeFromUrl && (
-            <div className="space-y-2">
-              <Label htmlFor="invite-code" className="text-xs tracking-widest uppercase text-[#F8F9FA]/50">
-                {"招待コード"}
-              </Label>
-              <Input
-                id="invite-code"
-                type="text"
-                placeholder="XXXX-XXXX-XXXX"
-                value={formData.inviteCode}
-                onChange={(e) => setFormData({ ...formData, inviteCode: e.target.value })}
-                className="h-12 bg-[#F8F9FA]/5 border-[#F8F9FA]/10 text-[#F8F9FA] placeholder:text-[#F8F9FA]/25 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
-                required
-              />
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="last-name" className="text-xs tracking-widest uppercase text-[#F8F9FA]/50">

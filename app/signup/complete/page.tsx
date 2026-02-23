@@ -10,7 +10,7 @@ import { CheckCircle2 } from "lucide-react"
 import { submitScreeningAnswer } from "@/app/actions/auth"
 import { createClient } from "@/lib/supabase/client"
 
-export default function RegisterCompletePage() {
+export default function SignupCompletePage() {
   const [mounted, setMounted] = useState(false)
   const [answer, setAnswer] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)

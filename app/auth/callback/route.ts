@@ -60,7 +60,7 @@ export async function GET(request: Request) {
 
       // pending — 審査質問が未入力（OAuth 新規登録）→ 審査質問ページへ
       if (!profile?.screening_answer) {
-        return NextResponse.redirect(`${origin}/register/complete`)
+        return NextResponse.redirect(`${origin}/signup/complete`)
       }
 
       // pending（審査質問入力済み）→ ゲートウェイへ + 承認待ちメッセージ

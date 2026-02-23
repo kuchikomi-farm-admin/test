@@ -4,14 +4,12 @@ import React, { Suspense } from "react"
 
 import { useState } from "react"
 import Image from "next/image"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Lock, Eye, EyeOff, ArrowRight, ArrowLeft, Info, Mail } from "lucide-react"
-import { verifyInviteCode, signIn, requestPasswordReset } from "@/app/actions/auth"
-import { createClient } from "@/lib/supabase/client"
+import { Eye, EyeOff, ArrowLeft, Info, Mail } from "lucide-react"
+import { signIn, requestPasswordReset } from "@/app/actions/auth"
 
 export default function GatewayPage() {
   return (
@@ -24,38 +22,15 @@ export default function GatewayPage() {
 function GatewayContent() {
   const searchParams = useSearchParams()
   const callbackMessage = searchParams.get("message")
-  const [mode, setMode] = useState<"gate" | "login" | "reset">("gate")
-  const [inviteCode, setInviteCode] = useState("")
+  const [mode, setMode] = useState<"login" | "reset">("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [isValidating, setIsValidating] = useState(false)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState("")
-  const [referrerName, setReferrerName] = useState("")
-
-  const handleInviteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsValidating(true)
-
-    const result = await verifyInviteCode(inviteCode)
-
-    setIsValidating(false)
-    if (!result.valid) {
-      setError("招待コードが無効または使用済みです")
-      return
-    }
-
-    if (result.referrer_name) {
-      setReferrerName(result.referrer_name)
-    }
-    setMode("login")
-  }
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,22 +43,6 @@ function GatewayContent() {
     if (result?.error) {
       setError(result.error)
       setIsLoggingIn(false)
-    }
-  }
-
-  const handleGoogleLogin = async () => {
-    setError("")
-    setIsGoogleLoading(true)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-    if (error) {
-      setError("Google認証に失敗しました")
-      setIsGoogleLoading(false)
     }
   }
 
@@ -144,70 +103,7 @@ function GatewayContent() {
           </div>
         )}
 
-        {mode === "gate" ? (
-          /* Invitation Gate */
-          <div className="space-y-8">
-            <div className="text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/5">
-                <Lock className="w-6 h-6 text-[#D4AF37]" />
-              </div>
-              <p className="text-[#F8F9FA]/90 text-sm leading-relaxed font-light">
-                {"招待コードをお持ちの方のみ"}
-                <br />
-                {"入場いただけます"}
-              </p>
-            </div>
-
-            <form onSubmit={handleInviteSubmit} className="space-y-6">
-              <div className="space-y-2 text-center">
-                <Label htmlFor="invite-code" className="text-xs tracking-widest uppercase text-[#F8F9FA]/50">
-                  Invitation Code
-                </Label>
-                <Input
-                  id="invite-code"
-                  type="text"
-                  placeholder="XXXX-XXXX-XXXX"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  className="h-12 bg-[#F8F9FA]/5 border-[#F8F9FA]/10 text-[#F8F9FA] placeholder:text-[#F8F9FA]/25 text-center tracking-[0.2em] text-lg focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20"
-                  required
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isValidating || !inviteCode}
-                className="w-full h-12 bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-[#1B3022] font-medium tracking-wider"
-              >
-                {isValidating ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-[#1B3022]/30 border-t-[#1B3022] rounded-full animate-spin" />
-                    {"認証中..."}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    {"入場する"}
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
-                )}
-              </Button>
-            </form>
-
-            <p className="text-center text-xs text-[#F8F9FA]/30">
-              {"招待コードは既存会員からのみ発行されます"}
-            </p>
-
-            <div className="text-center pt-4 border-t border-[#F8F9FA]/10">
-              <button
-                type="button"
-                onClick={() => setMode("login")}
-                className="text-xs text-[#D4AF37]/70 hover:text-[#D4AF37] transition-colors tracking-wider"
-              >
-                {"既に会員の方はこちらからログイン"}
-              </button>
-            </div>
-          </div>
-        ) : mode === "login" ? (
+        {mode === "login" ? (
           /* Login Form */
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -217,11 +113,6 @@ function GatewayContent() {
               <p className="text-[#F8F9FA]/70 text-sm font-light">
                 {"アカウントにログインしてください"}
               </p>
-              {referrerName && (
-                <p className="text-[#F8F9FA]/50 text-xs mt-1">
-                  {`${referrerName} さんからの招待で認証済み`}
-                </p>
-              )}
             </div>
 
             <form onSubmit={handleLoginSubmit} className="space-y-5">
@@ -281,27 +172,6 @@ function GatewayContent() {
               </Button>
             </form>
 
-            {/* Google Login */}
-            <div className="flex items-center gap-3">
-              <span className="flex-1 h-px bg-[#F8F9FA]/10" />
-              <span className="text-xs text-[#F8F9FA]/30">or</span>
-              <span className="flex-1 h-px bg-[#F8F9FA]/10" />
-            </div>
-
-            <button
-              type="button"
-              disabled
-              className="w-full h-12 flex items-center justify-center gap-3 rounded-md bg-white/30 text-[#F8F9FA]/40 font-medium tracking-wider cursor-not-allowed"
-            >
-              <svg className="w-5 h-5 opacity-40" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              {"Googleでログイン（準備中）"}
-            </button>
-
             <div className="text-center">
               <button
                 type="button"
@@ -312,21 +182,9 @@ function GatewayContent() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-[#F8F9FA]/40">
-              <button
-                type="button"
-                onClick={() => { setMode("gate"); setError("") }}
-                className="hover:text-[#D4AF37] transition-colors"
-              >
-                {"招待コード入力に戻る"}
-              </button>
-              <Link
-                href={`/register${inviteCode ? `?code=${encodeURIComponent(inviteCode)}` : ""}`}
-                className="hover:text-[#D4AF37] transition-colors"
-              >
-                {"新規登録"}
-              </Link>
-            </div>
+            <p className="text-center text-xs text-[#F8F9FA]/30">
+              {"新規登録は招待リンクからのみ可能です"}
+            </p>
           </div>
         ) : (
           /* Password Reset Form */

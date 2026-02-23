@@ -16,11 +16,11 @@ export const emailSchema = z
   .max(254, "メールアドレスが長すぎます")
   .transform((v) => v.toLowerCase().trim())
 
-// ──────── 招待コード ────────
-export const inviteCodeSchema = z
+// ──────── 招待リンク ref コード ────────
+export const refCodeSchema = z
   .string()
-  .min(1, "招待コードを入力してください")
-  .transform((v) => v.toUpperCase().trim())
+  .min(1, "招待リンクが無効です")
+  .transform((v) => v.trim())
 
 // ──────── サインアップ ────────
 export const signUpSchema = z.object({
@@ -38,7 +38,7 @@ export const signUpSchema = z.object({
     .string()
     .min(10, "審査項目は10文字以上で入力してください")
     .max(1000, "審査項目は1000文字以下で入力してください"),
-  inviteCode: inviteCodeSchema,
+  ref: refCodeSchema,
 })
 
 export type SignUpInput = z.infer<typeof signUpSchema>

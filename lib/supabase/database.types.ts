@@ -79,6 +79,7 @@ export interface Database {
           created_by: string
           used_by: string | null
           is_used: boolean
+          click_count: number
           expires_at: string | null
           created_at: string
         }
@@ -88,6 +89,7 @@ export interface Database {
           id?: string
           used_by?: string | null
           is_used?: boolean
+          click_count?: number
           expires_at?: string | null
           created_at?: string
         }
@@ -97,6 +99,7 @@ export interface Database {
           id?: string
           used_by?: string | null
           is_used?: boolean
+          click_count?: number
           expires_at?: string | null
         }
         Relationships: []

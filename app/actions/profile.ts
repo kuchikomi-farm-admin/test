@@ -102,24 +102,29 @@ export async function updateNotificationPreferences(prefs: {
   return { success: true }
 }
 
-// ──────── 自分の招待コード取得 ────────
+// ──────── 自分の招待リンク取得 ────────
 export async function getMyInviteCode() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "未認証です" }
 
-  // 未使用の招待コードを取得（最新1件）
+  // 永続招待コードを取得（最新1件）
   const { data, error } = await supabase
     .from("invite_codes")
     .select("code")
     .eq("created_by", user.id)
-    .eq("is_used", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (error) return { error: "招待コードの取得に失敗しました" }
-  return { code: data?.code || null }
+  if (error) return { error: "招待リンクの取得に失敗しました" }
+
+  const code = data?.code || null
+  const inviteUrl = code
+    ? `${process.env.NEXT_PUBLIC_APP_URL}/signup?ref=${code}`
+    : null
+
+  return { code, inviteUrl }
 }
 
 // ──────── 紹介実績取得 ────────
@@ -128,14 +133,22 @@ export async function getReferralStats() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "未認証です" }
 
+  // クリック数は invite_codes.click_count から集計
+  const { data: codes } = await supabase
+    .from("invite_codes")
+    .select("click_count")
+    .eq("created_by", user.id)
+
+  const totalClicks = (codes || []).reduce((sum, c) => sum + (c.click_count || 0), 0)
+
+  // 登録数は referrals テーブルから集計
   const { data: referrals, error } = await supabase
     .from("referrals")
-    .select("id, clicked_at, registered_at")
+    .select("id, registered_at")
     .eq("referrer_id", user.id)
 
   if (error) return { error: "紹介実績の取得に失敗しました" }
 
-  const totalClicks = referrals?.length || 0
   const registrations = referrals?.filter(r => r.registered_at !== null).length || 0
 
   return {
@@ -145,7 +158,7 @@ export async function getReferralStats() {
   }
 }
 
-// ──────── 招待コード生成 ────────
+// ──────── 招待リンク取得（永続コード） ────────
 export async function generateInviteCode() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -155,15 +168,20 @@ export async function generateInviteCode() {
 
   if (error) {
     console.error("[generateInviteCode] RPC error:", error)
-    return { error: `招待コードの生成に失敗しました: ${error.message}` }
+    return { error: `招待リンクの取得に失敗しました: ${error.message}` }
   }
 
   const result = data as { code?: string; error?: string } | null
   if (!result || result.error) {
-    return { error: result?.error || "招待コードの生成に失敗しました" }
+    return { error: result?.error || "招待リンクの取得に失敗しました" }
   }
 
-  return { code: result.code }
+  const code = result.code
+  const inviteUrl = code
+    ? `${process.env.NEXT_PUBLIC_APP_URL}/signup?ref=${code}`
+    : null
+
+  return { code, inviteUrl }
 }
 
 // ──────── 招待枠取得 ────────

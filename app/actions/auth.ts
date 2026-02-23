@@ -5,13 +5,16 @@ import {
   signUpSchema,
   signInSchema,
   changePasswordSchema,
+  passwordSchema,
   emailSchema,
+  refCodeSchema,
   type SignUpInput,
   type SignInInput,
   type ChangePasswordInput,
 } from "@/lib/validations/auth"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // ──────── 招待コード検証 ────────
 export async function verifyInviteCode(code: string) {
@@ -39,13 +42,13 @@ export async function signUp(input: SignUpInput) {
     }
   }
 
-  const { lastName, firstName, email, password, question, inviteCode } =
+  const { lastName, firstName, email, password, question, ref } =
     parsed.data
 
   // 2. 招待コード再検証 (TOCTOU 対策)
-  const codeCheck = await verifyInviteCode(inviteCode)
+  const codeCheck = await verifyInviteCode(ref)
   if (!codeCheck.valid) {
-    return { error: "招待コードが無効または使用済みです" }
+    return { error: "招待リンクが無効です" }
   }
 
   // 3. Supabase Auth サインアップ
@@ -57,7 +60,7 @@ export async function signUp(input: SignUpInput) {
       data: {
         display_name: `${lastName} ${firstName}`,
         screening_answer: question,
-        invite_code: inviteCode,
+        invite_code: ref,
       },
       emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
     },
@@ -151,6 +154,17 @@ export async function requestPasswordReset(email: string) {
     return { error: parsed.error.errors[0].message }
   }
 
+  // アカウント存在チェック（admin client で RLS を迂回）
+  const admin = createAdminClient()
+  const { count } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("email", parsed.data)
+
+  if (!count || count === 0) {
+    return { error: "このメールアドレスで登録されたアカウントが見つかりません" }
+  }
+
   const supabase = await createClient()
 
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
@@ -161,7 +175,6 @@ export async function requestPasswordReset(email: string) {
     return { error: "リセットメールの送信に失敗しました。しばらく経ってからお試しください" }
   }
 
-  // セキュリティ上、メールが存在しない場合も成功レスポンスを返す
   return { success: true }
 }
 
@@ -188,6 +201,37 @@ export async function submitScreeningAnswer(answer: string) {
 
   if (error) {
     return { error: "送信中にエラーが発生しました" }
+  }
+
+  await supabase.auth.signOut()
+
+  return { success: true }
+}
+
+// ──────── パスワード再設定（リセットリンク経由） ────────
+export async function resetPassword(newPassword: string) {
+  const parsed = passwordSchema.safeParse(newPassword)
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0].message }
+  }
+
+  const supabase = await createClient()
+
+  // リセットリンクで認証済みセッションが必要
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user?.email) {
+    return { error: "セッションが無効です。リセットリンクを再度お試しください" }
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data,
+  })
+
+  if (error) {
+    return { error: "パスワードの更新に失敗しました" }
   }
 
   await supabase.auth.signOut()

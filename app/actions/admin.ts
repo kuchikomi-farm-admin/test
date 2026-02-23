@@ -37,12 +37,20 @@ export async function getAdminUsers() {
   // 各ユーザーの紹介実績を取得
   const users = await Promise.all(
     (profiles || []).map(async (p) => {
+      // クリック数は invite_codes.click_count から集計
+      const { data: codes } = await adminClient
+        .from("invite_codes")
+        .select("click_count")
+        .eq("created_by", p.id)
+
+      const clicks = (codes || []).reduce((sum, c) => sum + (c.click_count || 0), 0)
+
+      // 登録数は referrals テーブルから集計
       const { data: referrals } = await adminClient
         .from("referrals")
-        .select("id, referred_id, clicked_at, registered_at")
+        .select("id, registered_at")
         .eq("referrer_id", p.id)
 
-      const clicks = referrals?.length || 0
       const registrations = referrals?.filter((r) => r.registered_at !== null).length || 0
 
       return {

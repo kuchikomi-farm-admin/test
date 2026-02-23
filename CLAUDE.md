@@ -34,20 +34,21 @@ No test framework is configured.
 
 All pages are client components (`"use client"`). Routes:
 
-- `/` — Gateway/login (invitation code flow)
+- `/` — Login page
+- `/signup?ref=CODE` — Registration (via invite link, ref param required)
+- `/signup/complete` — OAuth post-registration screening question
 - `/feed` — Main content feed (articles, videos, external links)
 - `/article/[id]` — Article detail (dynamic route, uses `use()` hook for params)
-- `/mypage` — User profile & referral dashboard
+- `/mypage` — User profile & referral dashboard (permanent invite link)
 - `/settings` — Account settings (profile, password, notifications)
-- `/register` — Registration (with invite code from URL param)
 - `/admin` — Admin dashboard (tabs: overview, content, users, rewards, broadcasts)
 - `/auth/callback` — Supabase email verification callback
 
-### Auth Flow (3-gate system)
+### Auth Flow (2-gate system)
 
-1. Invite code verification → 2. Email confirmation → 3. Admin approval (pending → active)
+1. Invite link access (`/signup?ref=CODE`) → 2. Email confirmation → 3. Admin approval (pending → active)
 
-- `middleware.ts` — Route guard (public paths: `/`, `/register`, `/auth/callback`)
+- `middleware.ts` — Route guard (public paths: `/`, `/signup`, `/signup/complete`, `/auth/callback`, `/auth/reset-callback`, `/reset-password`)
 - `lib/supabase/auth-provider.tsx` — Syncs Supabase auth state to Zustand store
 - `app/actions/auth.ts` — Server Actions: signUp, signIn, signOut, changePassword, verifyInviteCode
 - `app/actions/profile.ts` — Server Actions: updateProfile, getNotificationPreferences, etc.
