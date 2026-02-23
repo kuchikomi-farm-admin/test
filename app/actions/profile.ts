@@ -104,35 +104,24 @@ export async function getMyInviteCode() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "未認証です" }
 
-  // 永続招待コードを取得（最新1件）
-  const { data, error } = await supabase
-    .from("invite_codes")
-    .select("code")
-    .eq("created_by", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // RPC で既存コード取得 or 自動生成（SECURITY DEFINER で RLS 回避）
+  const { data, error } = await supabase.rpc("generate_invite_code")
 
-  if (error) return { error: "招待リンクの取得に失敗しました" }
-
-  let code = data?.code || null
-
-  // コードがない場合は RPC で自動生成（既存ユーザー対応）
-  if (!code) {
-    const { data: rpcData, error: rpcError } = await supabase.rpc("generate_invite_code")
-    if (!rpcError && rpcData) {
-      const result = rpcData as { code?: string; error?: string }
-      if (result.code) {
-        code = result.code
-      }
-    }
+  if (error) {
+    console.error("[getMyInviteCode] RPC error:", error)
+    return { error: "招待リンクの取得に失敗しました" }
   }
 
-  const inviteUrl = code
-    ? `${process.env.NEXT_PUBLIC_APP_URL}/signup?ref=${code}`
-    : null
+  const result = data as { code?: string; error?: string } | null
+  if (!result || result.error || !result.code) {
+    console.error("[getMyInviteCode] RPC result:", result)
+    return { error: result?.error || "招待リンクの取得に失敗しました" }
+  }
 
-  return { code, inviteUrl }
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thejapanlocalmedia.vercel.app"
+  const inviteUrl = `${appUrl}/signup?ref=${result.code}`
+
+  return { code: result.code, inviteUrl }
 }
 
 // ──────── 紹介実績取得 ────────

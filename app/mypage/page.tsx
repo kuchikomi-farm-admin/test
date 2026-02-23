@@ -34,8 +34,12 @@ export default function MyPage() {
   useEffect(() => {
     setMounted(true)
     getMyInviteCode().then((result) => {
-      if ("inviteUrl" in result && result.inviteUrl) setInviteUrl(result.inviteUrl)
-    })
+      if ("inviteUrl" in result && result.inviteUrl) {
+        setInviteUrl(result.inviteUrl)
+      } else {
+        setInviteUrl("")  // エラー時は空文字でローディング解除
+      }
+    }).catch(() => setInviteUrl(""))
     getReferralStats().then((result) => {
       if ("referralCount" in result) {
         setReferralCount(result.referralCount)
@@ -83,7 +87,12 @@ export default function MyPage() {
             <h2 className="text-sm font-medium tracking-wider text-[#D4AF37]">{"あなたの招待リンク"}</h2>
           </div>
 
-          {inviteUrl ? (
+          {inviteUrl === null ? (
+            <div className="flex items-center justify-center gap-3 py-4">
+              <div className="w-4 h-4 border-2 border-[#D4AF37]/30 border-t-[#D4AF37] rounded-full animate-spin" />
+              <p className="text-sm text-[#F8F9FA]/40">{"招待リンクを取得中..."}</p>
+            </div>
+          ) : inviteUrl ? (
             <>
               <div className="flex items-center gap-3">
                 <div className="flex-1 rounded-xl px-5 py-4 bg-[#F8F9FA]/10 border-2 border-transparent">
@@ -115,7 +124,7 @@ export default function MyPage() {
             </>
           ) : (
             <div className="text-center py-4">
-              <p className="text-sm text-[#F8F9FA]/40">{"招待リンクを読み込み中..."}</p>
+              <p className="text-sm text-red-400/70">{"招待リンクの取得に失敗しました。ページを再読み込みしてください。"}</p>
             </div>
           )}
 
