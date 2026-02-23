@@ -41,11 +41,7 @@ export async function updateProfile(input: UpdateProfileInput) {
     .from("profiles")
     .update({
       display_name: parsed.data.displayName,
-      phone: parsed.data.phone || null,
       bio: parsed.data.bio || null,
-      location: parsed.data.location || null,
-      company: parsed.data.company || null,
-      position: parsed.data.position || null,
     })
     .eq("id", user.id)
 
@@ -119,7 +115,19 @@ export async function getMyInviteCode() {
 
   if (error) return { error: "招待リンクの取得に失敗しました" }
 
-  const code = data?.code || null
+  let code = data?.code || null
+
+  // コードがない場合は RPC で自動生成（既存ユーザー対応）
+  if (!code) {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("generate_invite_code")
+    if (!rpcError && rpcData) {
+      const result = rpcData as { code?: string; error?: string }
+      if (result.code) {
+        code = result.code
+      }
+    }
+  }
+
   const inviteUrl = code
     ? `${process.env.NEXT_PUBLIC_APP_URL}/signup?ref=${code}`
     : null
