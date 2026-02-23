@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import {
   updateProfileSchema,
   type UpdateProfileInput,
@@ -104,24 +105,50 @@ export async function getMyInviteCode() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "未認証です" }
 
-  // RPC で既存コード取得 or 自動生成（SECURITY DEFINER で RLS 回避）
-  const { data, error } = await supabase.rpc("generate_invite_code")
+  const admin = createAdminClient()
 
-  if (error) {
-    console.error("[getMyInviteCode] RPC error:", error)
-    return { error: "招待リンクの取得に失敗しました" }
+  // 1. 既存の招待コードを取得（admin client で RLS 回避）
+  const { data: existing } = await admin
+    .from("invite_codes")
+    .select("code")
+    .eq("created_by", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  let code = existing?.code || null
+
+  // 2. コードがなければ直接生成して INSERT
+  if (!code) {
+    for (let i = 0; i < 10; i++) {
+      const candidate = Math.random().toString(36).slice(2, 10)
+      const { data: conflict } = await admin
+        .from("invite_codes")
+        .select("id")
+        .eq("code", candidate)
+        .maybeSingle()
+
+      if (!conflict) {
+        const { error: insertError } = await admin
+          .from("invite_codes")
+          .insert({ code: candidate, created_by: user.id, is_used: false })
+
+        if (!insertError) {
+          code = candidate
+          break
+        }
+      }
+    }
   }
 
-  const result = data as { code?: string; error?: string } | null
-  if (!result || result.error || !result.code) {
-    console.error("[getMyInviteCode] RPC result:", result)
-    return { error: result?.error || "招待リンクの取得に失敗しました" }
+  if (!code) {
+    return { error: "招待リンクの生成に失敗しました" }
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thejapanlocalmedia.vercel.app"
-  const inviteUrl = `${appUrl}/signup?ref=${result.code}`
+  const inviteUrl = `${appUrl}/signup?ref=${code}`
 
-  return { code: result.code, inviteUrl }
+  return { code, inviteUrl }
 }
 
 // ──────── 紹介実績取得 ────────
