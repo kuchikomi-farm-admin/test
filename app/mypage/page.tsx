@@ -5,7 +5,8 @@ import { AppHeader } from "@/components/app-header"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Copy, Check, Link2, Gift, Users, Star, Crown, Eye } from "lucide-react"
-import { getMyInviteCode, getReferralStats, getProfile, getRewardMilestones } from "@/app/actions/profile"
+import { getMyInviteCode, getReferralStats, getRewardMilestones } from "@/app/actions/profile"
+import { useUserStore } from "@/lib/store/use-user-store"
 
 const ICON_MAP: Record<string, typeof Gift> = { Gift, Star, Crown }
 const COLOR_MAP: Record<number, string> = {
@@ -21,15 +22,19 @@ const DEFAULT_MILESTONES = [
 ]
 
 export default function MyPage() {
+  const { user } = useUserStore()
   const [mounted, setMounted] = useState(false)
   const [copied, setCopied] = useState(false)
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
   const [referralCount, setReferralCount] = useState(0)
   const [clickCount, setClickCount] = useState(0)
   const [conversionRate, setConversionRate] = useState("0")
-  const [userName, setUserName] = useState("")
-  const [memberId, setMemberId] = useState("")
   const [milestones, setMilestones] = useState(DEFAULT_MILESTONES)
+
+  // ユーザー名・会員番号はクライアント側のZustand storeから取得
+  // （サーバーアクション経由だとcookieの不一致で別ユーザーのデータが返る可能性がある）
+  const userName = user?.name || ""
+  const memberId = user?.memberId || ""
 
   useEffect(() => {
     setMounted(true)
@@ -45,12 +50,6 @@ export default function MyPage() {
         setReferralCount(result.referralCount)
         setClickCount(result.clickCount)
         setConversionRate(result.conversionRate)
-      }
-    })
-    getProfile().then((result) => {
-      if ("data" in result && result.data) {
-        setUserName(result.data.display_name)
-        setMemberId(result.data.member_id)
       }
     })
     getRewardMilestones().then((result) => {

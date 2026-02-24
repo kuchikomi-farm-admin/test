@@ -105,50 +105,36 @@ export async function getMyInviteCode() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "未認証です" }
 
-  const admin = createAdminClient()
+  // RPC で既存コード返却 or 新規生成（DB 内でアトミックに処理）
+  const { data, error } = await supabase.rpc("generate_invite_code")
 
-  // 1. 既存の招待コードを取得（admin client で RLS 回避）
-  const { data: existing } = await admin
-    .from("invite_codes")
-    .select("code")
-    .eq("created_by", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  if (error) {
+    console.error("[getMyInviteCode] RPC error:", error)
+    // RPC が失敗した場合、admin client でフォールバック
+    const admin = createAdminClient()
+    const { data: existing } = await admin
+      .from("invite_codes")
+      .select("code")
+      .eq("created_by", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-  let code = existing?.code || null
-
-  // 2. コードがなければ直接生成して INSERT
-  if (!code) {
-    for (let i = 0; i < 10; i++) {
-      const candidate = Math.random().toString(36).slice(2, 10)
-      const { data: conflict } = await admin
-        .from("invite_codes")
-        .select("id")
-        .eq("code", candidate)
-        .maybeSingle()
-
-      if (!conflict) {
-        const { error: insertError } = await admin
-          .from("invite_codes")
-          .insert({ code: candidate, created_by: user.id, is_used: false })
-
-        if (!insertError) {
-          code = candidate
-          break
-        }
-      }
+    if (existing?.code) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thejapanlocalmedia.vercel.app"
+      return { code: existing.code, inviteUrl: `${appUrl}/signup?ref=${existing.code}` }
     }
+
+    return { error: "招待リンクの取得に失敗しました" }
   }
 
-  if (!code) {
-    return { error: "招待リンクの生成に失敗しました" }
+  const result = data as { code?: string; error?: string } | null
+  if (!result?.code) {
+    return { error: result?.error || "招待リンクの取得に失敗しました" }
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thejapanlocalmedia.vercel.app"
-  const inviteUrl = `${appUrl}/signup?ref=${code}`
-
-  return { code, inviteUrl }
+  return { code: result.code, inviteUrl: `${appUrl}/signup?ref=${result.code}` }
 }
 
 // ──────── 紹介実績取得 ────────
