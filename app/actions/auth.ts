@@ -53,7 +53,11 @@ export async function signUp(input: SignUpInput) {
 
   // 3. Supabase Auth サインアップ
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+
+  // 既存セッションを明示的にクリア（ログイン中ユーザーが別アカウントで登録する際の干渉を防止）
+  await supabase.auth.signOut()
+
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -67,10 +71,25 @@ export async function signUp(input: SignUpInput) {
   })
 
   if (error) {
+    console.error("[signUp] Supabase auth error:", error.message, error.status)
     if (error.message.includes("already registered")) {
       return { error: "このメールアドレスは既に登録されています" }
     }
-    return { error: "登録中にエラーが発生しました" }
+    if (error.message.includes("password")) {
+      return { error: "パスワードは8文字以上で、英字と数字を含めてください" }
+    }
+    if (error.status === 429) {
+      return { error: "登録の試行回数が上限に達しました。しばらく待ってからお試しください" }
+    }
+    if (error.message.includes("email")) {
+      return { error: "メールアドレスに問題があります。別のアドレスをお試しください" }
+    }
+    return { error: `登録中にエラーが発生しました（${error.message}）` }
+  }
+
+  // Supabase がユーザーを作成したが identities が空の場合（既存メールの再登録試行）
+  if (data?.user && data.user.identities?.length === 0) {
+    return { error: "このメールアドレスは既に登録されています" }
   }
 
   return { success: true }
@@ -84,6 +103,9 @@ export async function signIn(input: SignInInput) {
   }
 
   const supabase = await createClient()
+
+  // 既存セッションを明示的にクリア（別アカウントへの切替時にセッション競合を防止）
+  await supabase.auth.signOut()
 
   // Supabase Auth ログイン
   const { data, error } = await supabase.auth.signInWithPassword({

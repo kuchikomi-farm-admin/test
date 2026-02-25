@@ -102,7 +102,11 @@ export async function updateNotificationPreferences(prefs: {
 // ──────── 自分の招待リンク取得 ────────
 export async function getMyInviteCode() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError) {
+    console.error("[getMyInviteCode] Auth error:", authError.message)
+    return { error: "認証情報の取得に失敗しました" }
+  }
   if (!user) return { error: "未認証です" }
 
   // RPC で既存コード返却 or 新規生成（DB 内でアトミックに処理）
@@ -112,13 +116,17 @@ export async function getMyInviteCode() {
     console.error("[getMyInviteCode] RPC error:", error)
     // RPC が失敗した場合、admin client でフォールバック
     const admin = createAdminClient()
-    const { data: existing } = await admin
+    const { data: existing, error: selectError } = await admin
       .from("invite_codes")
       .select("code")
       .eq("created_by", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    if (selectError) {
+      console.error("[getMyInviteCode] Fallback select error:", selectError.message)
+    }
 
     if (existing?.code) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thejapanlocalmedia.vercel.app"
@@ -130,6 +138,7 @@ export async function getMyInviteCode() {
 
   const result = data as { code?: string; error?: string } | null
   if (!result?.code) {
+    console.error("[getMyInviteCode] RPC returned no code for user:", user.id, result)
     return { error: result?.error || "招待リンクの取得に失敗しました" }
   }
 
