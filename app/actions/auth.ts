@@ -57,12 +57,14 @@ export async function signUp(input: SignUpInput) {
   // 既存セッションを明示的にクリア（ログイン中ユーザーが別アカウントで登録する際の干渉を防止）
   await supabase.auth.signOut()
 
+  const displayName = `${lastName} ${firstName}`
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        display_name: `${lastName} ${firstName}`,
+        display_name: displayName,
         screening_answer: question,
         invite_code: ref,
       },
@@ -72,6 +74,14 @@ export async function signUp(input: SignUpInput) {
 
   if (error) {
     console.error("[signUp] Supabase auth error:", error.message, error.status)
+
+    // DB トリガー (handle_new_user) 失敗時のフォールバック
+    // admin API でユーザーを作成し、プロファイルを手動構築
+    if (error.message.includes("Database error saving new user")) {
+      console.error("[signUp] Trigger failure detected, attempting admin fallback...")
+      return await signUpWithAdminFallback(email, password, displayName, question, ref)
+    }
+
     if (error.message.includes("already registered")) {
       return { error: "このメールアドレスは既に登録されています" }
     }
@@ -93,6 +103,170 @@ export async function signUp(input: SignUpInput) {
   }
 
   return { success: true }
+}
+
+// ──────── admin API フォールバック登録 ────────
+// handle_new_user トリガーが失敗した場合に admin client で直接ユーザーとプロファイルを作成
+async function signUpWithAdminFallback(
+  email: string,
+  password: string,
+  displayName: string,
+  question: string,
+  ref: string,
+) {
+  const admin = createAdminClient()
+
+  // 1. まず既存ユーザーをチェック（前回の失敗で auth.users に残っている可能性）
+  const { data: existingUsers } = await admin.auth.admin.listUsers()
+  const existingUser = existingUsers?.users?.find(u => u.email === email)
+
+  let userId: string
+
+  if (existingUser) {
+    // 既存ユーザーが存在 — プロファイルが無いかチェック
+    userId = existingUser.id
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (existingProfile) {
+      // プロファイルも存在する → 既に登録済み
+      return { error: "このメールアドレスは既に登録されています" }
+    }
+    console.log("[signUp fallback] Found orphaned auth user, creating profile:", userId)
+  } else {
+    // 2. admin API でユーザーを作成（トリガーを再度試行）
+    //    email_confirm: false で確認メールのトリガーは別途行う
+    const { data: newUser, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+      user_metadata: {
+        display_name: displayName,
+        screening_answer: question,
+        invite_code: ref,
+      },
+    })
+
+    if (createError) {
+      console.error("[signUp fallback] admin.createUser failed:", createError.message)
+
+      // createUser もトリガーで失敗した場合、ユーザーだけ作成を試みる
+      // （トリガーなしで直接 auth.users に入れることはできないため、ここで諦める）
+      if (createError.message.includes("Database error")) {
+        return {
+          error: "データベースの初期設定に問題があります。管理者にお問い合わせください",
+        }
+      }
+      if (createError.message.includes("already been registered")) {
+        return { error: "このメールアドレスは既に登録されています" }
+      }
+      return { error: `登録中にエラーが発生しました（${createError.message}）` }
+    }
+
+    if (!newUser?.user) {
+      return { error: "ユーザーの作成に失敗しました" }
+    }
+
+    userId = newUser.user.id
+
+    // admin.createUser が成功 = トリガーも成功 → プロファイルは作成済み
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (profile) {
+      // トリガーが成功してプロファイルが作成された
+      // 確認メールを送信
+      await admin.auth.admin.generateLink({
+        type: "signup",
+        email,
+        options: {
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        },
+      })
+      return { success: true }
+    }
+
+    console.log("[signUp fallback] User created but no profile, creating manually:", userId)
+  }
+
+  // 3. プロファイルを手動作成
+  try {
+    // 招待コードから紹介者を取得
+    const { data: inviteCode } = await admin
+      .from("invite_codes")
+      .select("id, created_by")
+      .or(`code.eq.${ref.toUpperCase()},code.eq.${ref.toLowerCase()}`)
+      .limit(1)
+      .maybeSingle()
+
+    // 紹介者の存在確認
+    let invitedBy: string | null = null
+    if (inviteCode?.created_by) {
+      const { data: referrer } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("id", inviteCode.created_by)
+        .maybeSingle()
+      if (referrer) {
+        invitedBy = inviteCode.created_by
+      }
+    }
+
+    // プロファイル作成
+    const { error: profileError } = await admin
+      .from("profiles")
+      .insert({
+        id: userId,
+        display_name: displayName,
+        email,
+        screening_answer: question,
+        invited_by: invitedBy,
+      })
+
+    if (profileError) {
+      console.error("[signUp fallback] Profile insert failed:", profileError.message)
+      // ユーザーは作成されたがプロファイルが作成できなかった場合、ユーザーを削除
+      await admin.auth.admin.deleteUser(userId)
+      return { error: "プロファイルの作成に失敗しました。再度お試しください" }
+    }
+
+    // 関連テーブルの初期化（失敗しても続行）
+    await admin.from("invite_slots").insert({ user_id: userId, initial_slots: 2 }).catch(() => {})
+    await admin.from("notification_preferences").insert({ user_id: userId }).catch(() => {})
+
+    // 招待実績
+    if (inviteCode?.id && invitedBy) {
+      await admin.from("referrals").insert({
+        referrer_id: invitedBy,
+        referred_id: userId,
+        invite_code_id: inviteCode.id,
+        registered_at: new Date().toISOString(),
+      }).catch(() => {})
+    }
+
+    // 確認メールを送信
+    await admin.auth.admin.generateLink({
+      type: "signup",
+      email,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      },
+    })
+
+    console.log("[signUp fallback] Successfully created user and profile:", userId)
+    return { success: true }
+  } catch (e) {
+    console.error("[signUp fallback] Unexpected error:", e)
+    // クリーンアップ
+    await admin.auth.admin.deleteUser(userId).catch(() => {})
+    return { error: "登録処理中に予期しないエラーが発生しました。再度お試しください" }
+  }
 }
 
 // ──────── ログイン ────────
