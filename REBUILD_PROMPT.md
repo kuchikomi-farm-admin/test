@@ -27,7 +27,6 @@ Supabase      → データベース（会員情報・記事など）を作る
 Clerk         → ログイン・会員登録の仕組みを作る
 Resend        → サービスからメールを送れるようにする
 Upstash       → アクセス速度改善・不正アクセス対策
-Pinecone      → AIによるコンテンツ推薦機能
 PostHog       → 「どんなユーザーがどのページを見たか」を計測
 Sentry        → エラーが起きたとき自動で通知してもらう
 Vercel        → 作ったサービスをインターネットに公開する
@@ -62,9 +61,6 @@ Vercel        → 作ったサービスをインターネットに公開する
 【Upstash Redis】
   REST URL:             https://___________
   REST Token:           ___________________
-
-【Pinecone】
-  API Key:              ___________________
 
 【PostHog】
   Project API Key:      phc________________
@@ -268,29 +264,7 @@ Vercel        → 作ったサービスをインターネットに公開する
 
 ---
 
-### 1-8. Pinecone（AI記事推薦）
-> **何のため？** 「この記事を読んだ人には、こんな記事もおすすめ」という
-> AI推薦機能のためのデータベースです。普通のデータベースが「完全一致」で
-> 検索するのに対し、Pineconeは「意味的に似ているもの」を見つけられます。
-> **費用:** 無料（1インデックスまで）
-
-**手順:**
-1. https://www.pinecone.io を開く
-2. 「**Sign Up Free**」→ メールアドレスで登録（またはGoogleアカウント）
-3. ログイン後、「**Create Index**」をクリック
-4. 以下を設定:
-   - Index Name: `content-recommendations`
-   - Dimensions: `1536`（入力欄に数字で入力）
-   - Metric: **cosine** を選択
-   - Serverless → Region: **AWS ap-northeast-1** を選択
-5. 「**Create Index**」をクリック
-6. 左メニュー「**API Keys**」→ 表示された `PINECONE_API_KEY` をメモ
-
-✅ Pinecone設定完了
-
----
-
-### 1-9. PostHog（ユーザー行動分析）
+### 1-8. PostHog（ユーザー行動分析）
 > **何のため？** 「どのページに何人来たか」「どのボタンが押されたか」「どこで
 > 離脱したか」を可視化するサービスです。感覚ではなくデータでサービスを
 > 改善できるようになります。
@@ -391,7 +365,6 @@ Vercel        → 作ったサービスをインターネットに公開する
 - **データベース**: Supabase PostgreSQL（Service Role経由でServer Actionsから操作）
 - **メール**: Resend + React Email
 - **キャッシュ・レート制限**: Upstash Redis
-- **AIコンテンツ推薦**: Pinecone + OpenAI Embeddings
 - **プロダクト分析**: PostHog
 - **エラー監視**: Sentry
 - **ホスティング**: Vercel
@@ -416,8 +389,6 @@ npm install \
   @supabase/supabase-js \
   @upstash/redis \
   @upstash/ratelimit \
-  @pinecone-database/pinecone \
-  openai \
   resend \
   react-email \
   @react-email/components \
@@ -469,14 +440,6 @@ RESEND_FROM_EMAIL=noreply@kuchikomi-farm.com
 # ── Upstash Redis（キャッシュ）────────────────────
 UPSTASH_REDIS_REST_URL=https://ここに入力.upstash.io
 UPSTASH_REDIS_REST_TOKEN=ここに入力
-
-# ── Pinecone（AI推薦）────────────────────────────
-PINECONE_API_KEY=ここに入力
-PINECONE_INDEX=content-recommendations
-
-# ── OpenAI（記事のベクター生成用）──────────────────
-# OpenAIのAPIキーが必要: https://platform.openai.com/api-keys
-OPENAI_API_KEY=sk-ここに入力
 
 # ── PostHog（分析）──────────────────────────────
 NEXT_PUBLIC_POSTHOG_KEY=phc_ここに入力
@@ -650,7 +613,6 @@ create table contents (
   likes            int not null default 0,
   premium          boolean not null default false,
   required_rank    member_rank not null default 'standard',
-  embedding_synced boolean not null default false,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -817,7 +779,6 @@ src/
 ├── lib/
 │   ├── supabase.ts             # Supabaseクライアント（adminキー使用）
 │   ├── redis.ts                # Upstash Redisクライアント + レート制限
-│   ├── pinecone.ts             # Pinecone AIレコメンデーション
 │   ├── posthog.ts              # PostHog分析クライアント
 │   ├── email/
 │   │   ├── index.ts            # Resend送信ラッパー
@@ -1186,65 +1147,7 @@ export async function sendApprovalEmail({
 }
 ```
 
-## 手順12: lib/pinecone.ts（AIコンテンツ推薦）
-
-```typescript
-// src/lib/pinecone.ts
-import { Pinecone } from '@pinecone-database/pinecone'
-import OpenAI from 'openai'
-
-const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY! })
-const index = pinecone.index(process.env.PINECONE_INDEX!)
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
-// テキストをベクター（数値の配列）に変換
-export async function embedText(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text.slice(0, 8000), // 文字数制限
-  })
-  return response.data[0].embedding
-}
-
-// コンテンツをPineconeにインデックス（公開時に呼ぶ）
-export async function indexContent(
-  contentId: string,
-  title: string,
-  description: string
-) {
-  const text = `${title} ${description ?? ''}`
-  const embedding = await embedText(text)
-
-  await index.upsert([{
-    id: contentId,
-    values: embedding,
-    metadata: { title, description: description ?? '' },
-  }])
-}
-
-// 類似コンテンツのIDを返す（記事詳細ページの「関連記事」に使用）
-export async function findSimilarContents(
-  contentId: string,
-  topK = 4
-): Promise<string[]> {
-  const fetchResult = await index.fetch([contentId])
-  const vector = fetchResult.records[contentId]?.values
-  if (!vector) return []
-
-  const queryResult = await index.query({
-    vector,
-    topK: topK + 1,
-    includeMetadata: false,
-  })
-
-  return queryResult.matches
-    .filter(m => m.id !== contentId)
-    .slice(0, topK)
-    .map(m => m.id)
-}
-```
-
-## 手順13: app/layout.tsx（グローバルレイアウト）
+## 手順12: app/layout.tsx（グローバルレイアウト）
 
 ```typescript
 // src/app/layout.tsx
@@ -1540,7 +1443,7 @@ const { userId } = auth()
 **コンテンツフロー:**
 - [ ] `/feed` でコンテンツ一覧が表示される
 - [ ] いいね・ブックマークが動作する
-- [ ] `/article/[id]` で記事詳細と関連記事（Pinecone）が表示される
+- [ ] `/article/[id]` で記事詳細が表示される
 - [ ] 管理者がコンテンツを作成・編集・削除できる
 
 **その他:**
@@ -1565,11 +1468,7 @@ const { userId } = auth()
 4. **招待コードのレート制限**: `inviteCodeRatelimit` を必ず使う。
    使わないとbotによる総当たり攻撃を受ける可能性がある。
 
-5. **Pineconeのインデックス**: コンテンツを公開（status → 'published'）する
-   タイミングで `indexContent()` を呼び出す。
-   `embedding_synced = true` フラグで二重インデックスを防ぐ。
-
-6. **SSRとCSRの切り替え**: 全クライアントコンポーネントで mounted パターンを使う:
+5. **SSRとCSRの切り替え**: 全クライアントコンポーネントで mounted パターンを使う:
    ```typescript
    const [mounted, setMounted] = useState(false)
    useEffect(() => setMounted(true), [])
@@ -1670,14 +1569,9 @@ where email = 'あなたのメールアドレス@example.com';
 | **Cloudflare** | ¥0 | 無料 |
 | **Resend** | ¥0 | 無料（月3,000通まで）|
 | **Upstash** | ¥0 | 無料（月1万リクエストまで）|
-| **Pinecone** | ¥0 | 無料（1インデックスまで）|
 | **PostHog** | ¥0 | 無料（月100万イベントまで）|
 | **Sentry** | ¥0 | 無料（月5,000エラーまで）|
 | 🏁 **合計** | **¥3,150/月** | 初期フェーズは実質Claude代のみ |
-
-> ※ OpenAI（AIコンテンツ推薦用）のAPIキーが別途必要です。
-> https://platform.openai.com/api-keys でアカウント作成後、
-> 従量課金（記事100件のインデックスで約¥50程度）が発生します。
 
 ---
 
