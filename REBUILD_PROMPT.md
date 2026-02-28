@@ -2,7 +2,7 @@
 
 > **このドキュメントについて**
 > エンジニアでない方でも、この手順書を上から順番に実行すれば
-> `japanlocalmedia.com` でサービスを公開できるように書かれています。
+> `kuchikomi-farm.com` でサービスを公開できるように書かれています。
 > Claude Codeへの開発依頼プロンプトも含まれています。
 
 ---
@@ -21,7 +21,7 @@
 
 ```
 GitHub        → コードを保存する場所を作る
-Namecheap     → japanlocalmedia.com を買う
+Namecheap     → kuchikomi-farm.com を買う
 Cloudflare    → ドメインをサービスに繋げる
 Supabase      → データベース（会員情報・記事など）を作る
 Clerk         → ログイン・会員登録の仕組みを作る
@@ -74,7 +74,7 @@ Vercel        → 作ったサービスをインターネットに公開する
   DSN:                  https://___@___.ingest.sentry.io/___
 
 【Vercel】
-  公開URL（デプロイ後）: https://japanlocalmedia.com
+  公開URL（デプロイ後）: https://kuchikomi-farm.com
 ```
 
 ---
@@ -108,7 +108,7 @@ Vercel        → 作ったサービスをインターネットに公開する
 ---
 
 ### 1-2. Namecheap（ドメイン取得）
-> **何のため？** `japanlocalmedia.com` というURLを購入する場所です。
+> **何のため？** `kuchikomi-farm.com` というURLを購入する場所です。
 > このURLがないと、自分のサービスに「住所」がない状態になります。
 > **費用:** 約¥1,800〜¥2,500/年（年1回払い）
 
@@ -117,19 +117,19 @@ Vercel        → 作ったサービスをインターネットに公開する
 2. 右上「**Sign Up**」をクリック
 3. 名前・メール・パスワードを入力して登録 → メール認証
 4. ログイン後、検索バーに `japanlocalmedia` と入力して「**Search**」
-5. `japanlocalmedia.com` が表示されたら「**Add to Cart**」をクリック
+5. `kuchikomi-farm.com` が表示されたら「**Add to Cart**」をクリック
    - ⚠️ `.com` が既に取得済みの場合は `.jp` や `.net` も検討
 6. カートを確認 → 「**Confirm Order**」→ 支払い情報を入力して購入
 7. 購入完了後、「**Domain List**」でドメインが表示されることを確認
 
-> 📝 メモ: 取得したドメイン名（`japanlocalmedia.com`）を記録しておく
+> 📝 メモ: 取得したドメイン名（`kuchikomi-farm.com`）を記録しておく
 
 ✅ ドメイン取得完了
 
 ---
 
 ### 1-3. Cloudflare（ドメインの繋ぎ役）
-> **何のため？** 買ったドメイン（japanlocalmedia.com）を
+> **何のため？** 買ったドメイン（kuchikomi-farm.com）を
 > 実際のサーバー（Vercel）に繋ぐための「電話帳」的な役割を担います。
 > さらに、悪意のあるアクセスからサイトを守ってくれます。
 > **費用:** 無料
@@ -138,14 +138,14 @@ Vercel        → 作ったサービスをインターネットに公開する
 1. https://www.cloudflare.com を開く
 2. 右上「**Sign Up**」をクリック → メール・パスワードで登録
 3. ログイン後、「**Add a Site**」をクリック
-4. `japanlocalmedia.com` と入力 → 「**Add Site**」
+4. `kuchikomi-farm.com` と入力 → 「**Add Site**」
 5. 一番下の「**Free**」プランを選択 → 「**Continue**」
 6. 「**Continue**」をクリックしてスキャンを完了させる
 7. 画面に**2つのネームサーバー**が表示される（例: `xxx.ns.cloudflare.com`）
    → これを📝メモする（次のステップで使う）
 
 **Namecheapでネームサーバーを変更する:**
-8. Namecheapに戻る → 「**Domain List**」→ `japanlocalmedia.com` の「**Manage**」
+8. Namecheapに戻る → 「**Domain List**」→ `kuchikomi-farm.com` の「**Manage**」
 9. 「**Nameservers**」のドロップダウンを「**Custom DNS**」に変更
 10. CloudflareのネームサーバーをNameserver 1・2に入力 → 保存
 11. Cloudflareに戻り「**Done, check nameservers**」をクリック
@@ -221,11 +221,11 @@ Vercel        → 作ったサービスをインターネットに公開する
 1. https://resend.com を開く
 2. 「**Get Started**」→ GitHubでサインイン
 3. ダッシュボードが表示されたら、左メニュー「**Domains**」をクリック
-4. 「**Add Domain**」→ `japanlocalmedia.com` を入力 → 「**Add**」
+4. 「**Add Domain**」→ `kuchikomi-farm.com` を入力 → 「**Add**」
 5. DNSレコードが表示される → 以下の3種類のレコードをCloudflareに追加する
 
 **Cloudflareにメール認証用レコードを追加する:**
-6. Cloudflareのダッシュボードを開く → `japanlocalmedia.com` を選択
+6. Cloudflareのダッシュボードを開く → `kuchikomi-farm.com` を選択
 7. 「**DNS**」→「**Add Record**」をクリック
 8. Resendに表示された各レコードを1つずつ追加:
    - Type「TXT」のレコード → CloudflareでType: TXTを選択して入力
@@ -347,11 +347,11 @@ Vercel        → 作ったサービスをインターネットに公開する
 **ドメインの登録（後でやる作業のための下準備）:**
 6. ダッシュボードに戻り、作成したプロジェクトをクリック
 7. 「**Settings**」→「**Domains**」→「**Add**」
-8. `japanlocalmedia.com` と入力 → 「**Add**」
+8. `kuchikomi-farm.com` と入力 → 「**Add**」
 
 **Cloudflareに繋ぐためのDNSレコードを設定:**
 9. Vercelが「CNAME レコードを追加してください」と表示する
-10. Cloudflareを開く → `japanlocalmedia.com` → 「**DNS**」→「**Add Record**」
+10. Cloudflareを開く → `kuchikomi-farm.com` → 「**DNS**」→「**Add Record**」
 11. Type: `CNAME`, Name: `@`, Target: `cname.vercel-dns.com` を入力 → 「**Save**」
 
 ✅ Vercel設定完了（デプロイはSTEP 3で実施）
@@ -382,7 +382,7 @@ Vercel        → 作ったサービスをインターネットに公開する
 
 参考コード: /Users/[あなたのMacのユーザー名]/Desktop/closed-media-ui
 
-ドメイン: japanlocalmedia.com
+ドメイン: kuchikomi-farm.com
 
 ## 使用スタック
 - **フレームワーク**: Next.js 15 (App Router) + React 19 + TypeScript strict
@@ -464,7 +464,7 @@ SUPABASE_SERVICE_ROLE_KEY=ここに入力
 
 # ── Resend（メール送信）──────────────────────────
 RESEND_API_KEY=re_ここに入力
-RESEND_FROM_EMAIL=noreply@japanlocalmedia.com
+RESEND_FROM_EMAIL=noreply@kuchikomi-farm.com
 
 # ── Upstash Redis（キャッシュ）────────────────────
 UPSTASH_REDIS_REST_URL=https://ここに入力.upstash.io
@@ -486,7 +486,7 @@ NEXT_PUBLIC_POSTHOG_HOST=https://us.posthog.com
 NEXT_PUBLIC_SENTRY_DSN=https://ここに入力@ここに入力.ingest.sentry.io/ここに入力
 
 # ── アプリ設定 ──────────────────────────────────
-NEXT_PUBLIC_APP_URL=https://japanlocalmedia.com
+NEXT_PUBLIC_APP_URL=https://kuchikomi-farm.com
 ```
 
 ## 手順3: Supabaseのデータベースを設定
@@ -1119,7 +1119,7 @@ export function ApprovalEmail({ displayName }: ApprovalEmailProps) {
             TheJapanLocalMediaへようこそ！
           </Text>
           <Button
-            href="https://japanlocalmedia.com/feed"
+            href="https://kuchikomi-farm.com/feed"
             style={{
               backgroundColor: '#1B3022',
               color: '#D4AF37',
@@ -1547,7 +1547,7 @@ const { userId } = auth()
 - [ ] `/mypage` で招待リンクが表示される
 - [ ] PostHogにページビューが記録される
 - [ ] Sentryのダッシュボードにエラーが表示される（テスト用エラーで確認）
-- [ ] `japanlocalmedia.com` でHTTPS接続できる
+- [ ] `kuchikomi-farm.com` でHTTPS接続できる
 
 ## 実装時の重要注意事項
 
@@ -1622,9 +1622,9 @@ GitHubにプッシュされると、Vercelが自動でビルド＆公開しま�
 
 ### 3-3. Clerk WebhookのURLを設定する
 
-1. Vercelダッシュボードで公開URLを確認（例: `https://japanlocalmedia.com`）
+1. Vercelダッシュボードで公開URLを確認（例: `https://kuchikomi-farm.com`）
 2. Clerkダッシュボード → 「**Webhooks**」→ 「**Add Endpoint**」
-3. URL: `https://japanlocalmedia.com/api/webhooks/clerk`
+3. URL: `https://kuchikomi-farm.com/api/webhooks/clerk`
 4. Events:
    - ☑️ `user.created`
    - ☑️ `user.updated`
@@ -1635,7 +1635,7 @@ GitHubにプッシュされると、Vercelが自動でビルド＆公開しま�
 
 ### 3-4. 管理者アカウントを設定する
 
-1. `https://japanlocalmedia.com/sign-up` にアクセス
+1. `https://kuchikomi-farm.com/sign-up` にアクセス
 2. 自分のメールアドレスで会員登録
 3. Supabaseダッシュボード → 「**SQL Editor**」で以下を実行:
 ```sql
@@ -1644,11 +1644,11 @@ set role = 'admin', status = 'active'
 where email = 'あなたのメールアドレス@example.com';
 ```
 
-4. `https://japanlocalmedia.com/admin` にアクセスして管理画面が開けばOK
+4. `https://kuchikomi-farm.com/admin` にアクセスして管理画面が開けばOK
 
 ### 3-5. 動作確認チェックリスト
 
-- [ ] `https://japanlocalmedia.com` が表示される
+- [ ] `https://kuchikomi-farm.com` が表示される
 - [ ] サインアップ → ウェルカムメールが届く
 - [ ] 管理画面で承認 → 承認完了メールが届く
 - [ ] フィードページでコンテンツが表示される
@@ -1691,9 +1691,9 @@ A: Clerk WebhookのURLが正しく設定されているか確認してくださ�
 A: Resendのドメイン認証が完了しているか確認してください（緑色のVerified表示）。
    Resendダッシュボード → Logs でエラーを確認できます。
 
-**Q: `japanlocalmedia.com` にアクセスできない**
+**Q: `kuchikomi-farm.com` にアクセスできない**
 A: CloudflareのネームサーバーがNamecheapに反映されるまで最大48時間かかります。
-   https://dnschecker.org で `japanlocalmedia.com` を検索して確認してください。
+   https://dnschecker.org で `kuchikomi-farm.com` を検索して確認してください。
 
 **Q: 管理画面に入れない（403エラー）**
 A: Supabaseで `profiles.role = 'admin'` に設定したか確認してください。
@@ -1709,7 +1709,7 @@ A: Vercel → Deployments → 失敗したデプロイをクリック → Build 
 
 | 用語 | 意味 |
 |-----|------|
-| **ドメイン** | サービスの住所。`japanlocalmedia.com` のこと |
+| **ドメイン** | サービスの住所。`kuchikomi-farm.com` のこと |
 | **DNS** | ドメイン名をサーバーのIPアドレスに変換する仕組み（電話帳のようなもの）|
 | **データベース** | データを保存・整理する場所。Excelの超高機能版 |
 | **API** | プログラム同士が会話するための窓口 |
